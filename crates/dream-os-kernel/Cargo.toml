@@ -1,0 +1,16 @@
+[package]
+name = "dream-os-kernel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "DreamOS PoC: Windows/Android共通実行基盤の最小プロトタイプ(open-cudaのopencuda-vulkanを再利用したVulkan compute dispatch + 電力出力調整可能なマイニングOS向けスロットル制御)"
+
+[dependencies]
+opencuda-core = { path = "../../../open-cuda/crates/opencuda-core" }
+opencuda-vulkan = { path = "../../../open-cuda/crates/opencuda-vulkan", features = ["real-vulkan"] }
+opencuda-ir = { path = "../../../open-cuda/crates/opencuda-ir" }
+anyhow = "1"
+
+[dev-dependencies]

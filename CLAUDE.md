@@ -239,6 +239,59 @@ DreamOSがこれらとどう統合されるか(例: open-directxのVulkan実行�
   「ハイブリッドカーネル」という中核テーマへ着手する土台ができたと
   言える——現時点ではまだその手前の段階であることを正直に記録しておく。
 
+## PoC実装(2026-08-06、初のコード着手)
+
+ユーザー指示「グラフィックボードなどの電力出力調整も可能なマイニングOS
+も取り込んで」+「PoC設計・コード着手して下さい」への対応として、初めて
+コードを書いた。**新規`crates/dream-os-kernel`**(Cargoワークスペース、
+`Cargo.toml`をルートに新設):
+
+1. **`src/lib.rs`**: `open-cuda`の`opencuda-vulkan`(既に実機Windows
+   GT730・Android `aarch64-linux-android`クロスコンパイル実績のある
+   Vulkan Computeバックエンド)をpath依存で再利用し、`open_device()`・
+   `dispatch_vector_add_once()`という薄いラッパーを提供。「ゼロから
+   独自カーネルを書く」のではなく「実績のある既存クロスプラットフォーム
+   基盤を、DreamOSの共通実行層として組み立て直す」というChromeOS/
+   crosvm型のアプローチを踏襲(CLAUDE.md技術調査結果の結論通り)。
+2. **`src/power_profile.rs`**: グラフィックボード等の電力出力調整が
+   可能なマイニングOS向けの`MiningPowerProfile`(0〜100%の
+   `power_percent`)。**正直な開示**: `nvidia-smi -pl`のようなハード
+   ウェアレベルの電力制限APIではなく(ベンダー固有APIに依存しない
+   クロスプラットフォーム設計のため)、ディスパッチ間に休止を挟む
+   **ソフトウェア側のデューティサイクル制御**で実効稼働率を調整する
+   方式。単体テスト5件(0%=停止・100%=休止無し・50%/10%での期待休止
+   時間・100超のクランプ)。
+3. **`examples/dispatch_throttled.rs`+`shaders/vector_add.comp`**:
+   `glslc`でコンパイルしたSPIR-Vを実Vulkanデバイスへ複数回ディスパッチし、
+   `MiningPowerProfile`で実効稼働率を落とせることを実測する検証プログラム。
+
+**実機検証(型チェックのみで完了と報告しない、エコシステム既存ルール
+徹底)**: `cargo test --release`(5件全green)、
+`cargo run --example dispatch_throttled --release -- 50 5`を実際に
+Windows実機(NVIDIA GeForce GT 730)で実行し、`vector_add`の計算結果が
+正しいこと(誤差チェック内蔵)、電力出力50%指定で実効デューティサイクル
+約43.2%(目標50%に近い値、休止時間の粒度による誤差)を実測確認。
+Android向けは`ANDROID_NDK_HOME`(27.1.12297006)を設定した上で
+`cargo ndk -t aarch64-linux-android build --lib`を実行し、実際に
+`aarch64`向けの`.rlib`が生成されることを確認(`opencuda-vulkan`・
+`opencuda-core`・`opencuda-ir`を含め全クレートがクロスビルド成功)。
+
+**正直な開示・未検証事項**: (1) Android実機での実行(実際にVulkan
+デバイスを開けるか、`vkCreateInstance`が成功するか)は未検証——
+`open-cuda`側の2026-07-25監査と同じく「クロスコンパイル成功」の段階に
+留まる、実機/エミュレータでの動作確認は次回課題。(2) この`dispatch_
+throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実際の
+マイニングアルゴリズム(SHA256等のハッシュ計算カーネル)は未実装——
+今回は「電力出力調整の仕組み」の実証に絞った。(3)
+`nvidia-smi`相当のハードウェア電力制限APIとの連携(より正確な電力
+制御)は将来の課題として`power_profile.rs`のdocに明記済み。
+
+- 次にすべきこと: (1) 実際のマイニング相当のGPU計算カーネル
+  (ハッシュ計算等)を`dream-os-kernel`に追加する、(2) Android実機/
+  エミュレータでの実行検証、(3) open-directxの完成度向上が優先方針の
+  ため、本格的な機能拡張よりもopen-directx側の進捗を待ちつつ小さく
+  育てる方針を継続する。
+
 ## HANDOFF(直近の作業ログ、上が最新)
 
 - **2026-08-06(続き2) 実機ベースでスコープを絞り込み**: 上記

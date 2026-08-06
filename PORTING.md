@@ -23,11 +23,24 @@ dream-os/
 ├── README.md          # 日本語(主言語) / Japanese (primary language)
 ├── README-English.md  # 英語 / English
 ├── CLAUDE.md           # 開発方針・エコシステム内の位置づけ・HANDOFF
-└── PORTING.md          # 本ファイル / this file
+├── PORTING.md          # 本ファイル / this file
+├── Cargo.toml           # ワークスペース定義(2026-08-06新設)
+└── crates/
+    └── dream-os-kernel/  # PoC: open-cudaのopencuda-vulkanを再利用した
+                           # Windows/Android共通実行基盤+電力出力調整可能な
+                           # マイニングOS向けデューティサイクル制御
+        ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
+        ├── src/{lib,power_profile}.rs
+        ├── shaders/vector_add.{comp,spv}
+        └── examples/dispatch_throttled.rs
 ```
 
-現時点でこれ以上のファイルはありません(構想段階のため)。 / There is
-nothing else at this stage (concept phase only).
+`crates/dream-os-kernel`は`open-cuda`(`../../open-cuda`、同じ`F:\runo`
+直下にcloneされている前提)へのpath依存を持つため、移設する場合は
+`open-cuda`も同じ相対位置関係でcloneしておくこと。 / `crates/
+dream-os-kernel` has a path dependency on `open-cuda` (`../../open-cuda`,
+assumed cloned alongside this repo under `F:\runo`) — when relocating,
+keep `open-cuda` cloned at the same relative position.
 
 ## 2. VPS/ローカルとの対応 / Local & VPS locations
 
