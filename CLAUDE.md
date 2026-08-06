@@ -300,6 +300,22 @@ DreamOSがこれらとどう統合されるか(例: open-directxのVulkan実行�
   「ハイブリッドカーネル」という中核テーマへ着手する土台ができたと
   言える——現時点ではまだその手前の段階であることを正直に記録しておく。
 
+## World Laboratory構想の本格設計(2026-08-06、`docs/world-laboratory-design.md`新設)
+
+ユーザー指示「C(World Laboratory構想の本格設計)とD(一旦区切って
+open-directx優先に戻る)を集中して」への対応。[`docs/world-laboratory-
+design.md`](docs/world-laboratory-design.md)を新設し、BOINC/Folding@home/
+Golem Network/Petalsという実在の先行事例から教訓を抽出した3層アーキ
+テクチャ案(コーディネータ層=RPoem/open-web-server再利用、ワーカー層=
+`dream-os-kernel`拡張、実行基盤層=既存opencuda-vulkan)、ワークユニット
+設計、N-of-M多数決による結果検証(既存の`open-web-server-ledger::
+MultiRegionReplicator`と同じパターンの転用可能性)、Sybil耐性の課題、
+フェーズ0〜4の段階的ロードマップを記載。**今回は設計文書のみ、実装は
+一切行っていない**。
+- 次にすべきこと: フェーズ1(信頼できるノード群内でのコーディネータ↔
+  ワーカー間の最小実装)へ着手するかどうかは、open-directxの完成度向上が
+  優先方針のため、次回以降ユーザーと相談の上で判断する。
+
 ## マイニング相当の実ハッシュ計算カーネル+Android実機検証(2026-08-06)
 
 ユーザー指示「マイニング相当の実ハッシュ計算カーネル追加、または
