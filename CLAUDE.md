@@ -300,7 +300,7 @@ DreamOSがこれらとどう統合されるか(例: open-directxのVulkan実行�
   「ハイブリッドカーネル」という中核テーマへ着手する土台ができたと
   言える——現時点ではまだその手前の段階であることを正直に記録しておく。
 
-## World Laboratory構想の本格設計(2026-08-06、`docs/world-laboratory-design.md`新設)
+## World Laboratory構想の本格設計(2026-08-06、[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)新設)
 
 ユーザー指示「C(World Laboratory構想の本格設計)とD(一旦区切って
 open-directx優先に戻る)を集中して」への対応。[`docs/world-laboratory-
@@ -389,7 +389,7 @@ open-directx側の実`vector_add.dxbc`(`include_bytes!`で直接取り込み)を
 
 ### aruaru-db永続化(`crates/dream-os-wire/src/aruaru_persistence.rs`)
 
-World Laboratory構想(`docs/world-laboratory-design.md`)の通信・永続化層
+World Laboratory構想([world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md))の通信・永続化層
 (第4層)のうち、これまで「実DBインスタンスが無いため未配線」としていた
 永続化部分を、`aruaru-db`(ACID互換+Git-on-SQLバージョン管理)へ実際に
 接続する形で実装した。`tokio-postgres`で`aruaru-server`(pgwire)へ
@@ -507,7 +507,7 @@ GitHub上の実装や、ソフトウェアとして再現可能な技術では�
 ソフトウェア側の設計**を既に持っている(RTT/ジッター推定を
 RFC 6298/RFC 9002と同じSRTT/RTTVAR方式で行う)。dream-os-wireの
 将来の4重伝送路対応(今回未実装)でも、この既存のRS-SmartTCP設計を
-再利用する方針を`docs/world-laboratory-design.md`へ追記した——
+再利用する方針を[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)へ追記した——
 IOWN自体を「実装」することはできないが、IOWNのような低遅延回線が
 将来利用可能になった際に自動的に活かせる適応制御という形で、
 間接的に「取り込む」ことは可能という結論。
@@ -527,7 +527,7 @@ IOWN自体を「実装」することはできないが、IOWNのような低遅
 一方、AEAD+シーケンス番号によるアンチリプレイ(ASN技術)は業界標準
 パターンと確認でき、これは`open-web-server-wire::SecureChannel`が既に
 実装している設計と完全に一致した。この裏付けを踏まえ、`docs/
-world-laboratory-design.md`のアーキテクチャを3層から4層(コーディネータ/
+[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)のアーキテクチャを3層から4層(コーディネータ/
 **通信・永続化層〈新設〉**/ワーカー/実行基盤)へ拡張。
 
 **実装(設計文書だけに留めず、実際にコードを書いて実機検証)**:

@@ -3,7 +3,7 @@
 **構想段階のプロジェクトですが、2026-08-06より実機検証済みのPoC
 (概念実証)コードが複数存在します。** この`README.md`・
 [`CLAUDE.md`](CLAUDE.md)・[`PORTING.md`](PORTING.md)・
-[`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)で
+[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)で
 目的・スコープ・エコシステム内での位置づけ・実装状況を文書化しています。
 
 ## 目的
@@ -73,7 +73,7 @@ SDK・開発者ライセンスは一切ありません。「将来ライセン�
   計算結果の改ざん・リプレイを検知・拒否する`WorkerChannel`/
   `CoordinatorChannel`。正常送受信・リプレイ攻撃・改ざん結果、3つの
   シナリオを実際の暗号処理で検証済み。詳細な設計は
-  [`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)
+  [world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)
   参照。
 
 ## エコシステム内での位置づけ

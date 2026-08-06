@@ -5,7 +5,7 @@ several real-hardware-verified proof-of-concept code.** This
 `README-English.md` — along with [`README.md`](README.md) (Japanese, the
 primary language for this ecosystem), [`CLAUDE.md`](CLAUDE.md),
 [`PORTING.md`](PORTING.md), and
-[`docs/world-laboratory-design.md`](docs/world-laboratory-design.md) —
+[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md) —
 documents the purpose, scope, place within the ecosystem, and current
 implementation status of this project.
 
@@ -81,7 +81,7 @@ details).
   detecting and rejecting tampered or replayed worker results. Verified
   with three real cryptographic test scenarios (normal round-trip,
   replay rejection, tamper rejection). See
-  [`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)
+  [world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)
   for the full design.
 
 ## Place within the ecosystem

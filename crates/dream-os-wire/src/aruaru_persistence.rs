@@ -4,7 +4,7 @@
 //! RPoem・open-raid-z・aruaru-dbなどをベースに関連技術を実装開発、
 //! 完成度と連携性の向上をして」への対応。
 //!
-//! World Laboratory構想(`docs/world-laboratory-design.md`)の通信・
+//! World Laboratory構想(world-lab/docs/world-laboratory-design.md(https://github.com/aon-co-jp/world-lab))の通信・
 //! 永続化層(第4層)のうち、これまで「実DBインスタンスが無いため未配線」
 //! と記録していた永続化部分を、`aruaru-db`(ACID互換+Git-on-SQLの
 //! バージョン管理、`aruaru-server`が話すPostgreSQL wireプロトコル)へ

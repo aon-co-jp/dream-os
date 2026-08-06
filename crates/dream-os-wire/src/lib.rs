@@ -1,4 +1,4 @@
-//! dream-os-wire: World Laboratory構想(`docs/world-laboratory-design.md`)の
+//! dream-os-wire: World Laboratory構想(world-lab/docs/world-laboratory-design.md(https://github.com/aon-co-jp/world-lab))の
 //! ワーカー↔コーディネータ間通信・永続化層(2026-08-06新設)。
 //!
 //! ユーザー指示「open-web-server・RPoem・open-raid-z・aruaru-dbのACID
@@ -26,7 +26,7 @@
 //!   BOINCが本来必要とする「不正な結果の改ざん検知」「同一結果の
 //!   リプレイによる多数決の不正操作を防ぐ」という要件と、この第4層の
 //!   設計目的(改ざん検知+リプレイ対策)が完全に合致するため、
-//!   `world-laboratory-design.md`§3.3の結果検証の一部として位置づける。
+//!   world-lab/docs/world-laboratory-design.md§3.3の結果検証の一部として位置づける。
 //!
 //! ## 実装しなかったもの(正直な開示、設計のみ)
 //!
@@ -48,7 +48,7 @@
 //!   外)。World Laboratoryが実際に大量の結果を永続化する段階
 //!   (フェーズ2以降)で、`open-web-server-
 //!   ledger`をコーディネータ側の永続化層としてそのままpath依存で
-//!   再利用する設計方針だけを`world-laboratory-design.md`へ追記した
+//!   再利用する設計方針だけをworld-lab/docs/world-laboratory-design.mdへ追記した
 //!   (コードの実配線は次回以降)。
 
 pub mod aruaru_persistence;
@@ -61,7 +61,7 @@ use serde::{Deserialize, Serialize};
 
 /// ワーカーがコーディネータへ送る計算結果の envelope。
 ///
-/// `world-laboratory-design.md`§3.2の「ワークユニット」に対応する結果
+/// world-lab/docs/world-laboratory-design.md§3.2の「ワークユニット」に対応する結果
 /// メッセージ。`dream-os-kernel::mining::MiningBatchResult`のような
 /// 実際の計算結果を、ワーカーIDと共にコーディネータへ安全に送るための
 /// 契約。
