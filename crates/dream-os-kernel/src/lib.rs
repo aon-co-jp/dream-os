@@ -17,8 +17,10 @@
 //! Androidの2プラットフォームに限定する(macOS/iPhone・PS5/6・Switch2は
 //! 将来のライセンス取得を前提とした保留)。
 
+pub mod mining;
 pub mod power_profile;
 
+pub use mining::{hashrate, MiningBatchResult, MiningWorker};
 pub use power_profile::MiningPowerProfile;
 
 use std::sync::Arc;

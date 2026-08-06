@@ -30,9 +30,10 @@ dream-os/
                            # Windows/Android共通実行基盤+電力出力調整可能な
                            # マイニングOS向けデューティサイクル制御
         ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
-        ├── src/{lib,power_profile}.rs
-        ├── shaders/vector_add.{comp,spv}
-        └── examples/dispatch_throttled.rs
+        ├── src/{lib,power_profile,mining}.rs
+        ├── shaders/{vector_add,sha256d_mine}.{comp,spv}
+        ├── examples/{dispatch_throttled,mine_benchmark}.rs
+        └── tests/mining_real_vulkan.rs
 ```
 
 `crates/dream-os-kernel`は`open-cuda`(`../../open-cuda`、同じ`F:\runo`

@@ -14,3 +14,4 @@ opencuda-ir = { path = "../../../open-cuda/crates/opencuda-ir" }
 anyhow = "1"
 
 [dev-dependencies]
+sha2 = "0.10"

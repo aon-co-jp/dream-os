@@ -1,0 +1,116 @@
+#version 450
+
+// マイニング相当の実ハッシュ計算カーネル(2026-08-06追加)。
+// 32バイトのベースメッセージ(base[0..8) words)+ グローバル起点nonceに
+// invocation indexを加えた値を先頭4バイトへ埋め込み、SHA-256を2回
+// 適用(Bitcoin等のPoWで実際に使われるdouble-SHA256と同じ構成)した
+// 32バイトダイジェストを1スレッド1nonce分だけ出力する。
+// メッセージ長は32バイト固定のため、パディング後も常に単一64バイト
+// ブロックに収まる(SHA-256の1ブロック実装のみで足りる、複数ブロック
+// 対応は行っていない——正直な開示、docコメント参照)。
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer BaseMessage {
+    // base[0..7]: 32バイトのベースメッセージ(先頭4バイトはホスト側で
+    // 上書きされる想定のプレースホルダ、host側がnonceを埋め込んで送る
+    // のではなく、シェーダ側でinvocation indexから直接nonceを組み立てる)
+    uint base[8];
+};
+
+layout(set = 0, binding = 1) writeonly buffer Digests {
+    // digests[i*8 .. i*8+7]: nonce=nonce_base+i に対応する32バイト
+    // ダイジェスト(8 x uint32、ビッグエンディアンでSHA-256の慣例通り
+    // 上位ワードから順に格納)。
+    uint digests[];
+};
+
+layout(push_constant) uniform Params {
+    uint nonce_base;
+    uint count;
+} params;
+
+const uint K[64] = uint[64](
+    0x428a2f98u,0x71374491u,0xb5c0fbcfu,0xe9b5dba5u,0x3956c25bu,0x59f111f1u,0x923f82a4u,0xab1c5ed5u,
+    0xd807aa98u,0x12835b01u,0x243185beu,0x550c7dc3u,0x72be5d74u,0x80deb1feu,0x9bdc06a7u,0xc19bf174u,
+    0xe49b69c1u,0xefbe4786u,0x0fc19dc6u,0x240ca1ccu,0x2de92c6fu,0x4a7484aau,0x5cb0a9dcu,0x76f988dau,
+    0x983e5152u,0xa831c66du,0xb00327c8u,0xbf597fc7u,0xc6e00bf3u,0xd5a79147u,0x06ca6351u,0x14292967u,
+    0x27b70a85u,0x2e1b2138u,0x4d2c6dfcu,0x53380d13u,0x650a7354u,0x766a0abbu,0x81c2c92eu,0x92722c85u,
+    0xa2bfe8a1u,0xa81a664bu,0xc24b8b70u,0xc76c51a3u,0xd192e819u,0xd6990624u,0xf40e3585u,0x106aa070u,
+    0x19a4c116u,0x1e376c08u,0x2748774cu,0x34b0bcb5u,0x391c0cb3u,0x4ed8aa4au,0x5b9cca4fu,0x682e6ff3u,
+    0x748f82eeu,0x78a5636fu,0x84c87814u,0x8cc70208u,0x90befffau,0xa4506cebu,0xbef9a3f7u,0xc67178f2u
+);
+
+uint rotr(uint x, uint n) {
+    return (x >> n) | (x << (32u - n));
+}
+
+// 1ブロック(64バイト、16ワード)分のSHA-256圧縮関数。
+// `h`は呼び出し前に初期ハッシュ値(または前ブロックの結果)を渡し、
+// 呼び出し後に更新後の値が入る。
+void sha256_compress(inout uint h[8], uint w0, uint w1, uint w2, uint w3, uint w4, uint w5, uint w6, uint w7,
+                      uint w8, uint w9, uint w10, uint w11, uint w12, uint w13, uint w14, uint w15) {
+    uint w[64];
+    w[0]=w0; w[1]=w1; w[2]=w2; w[3]=w3; w[4]=w4; w[5]=w5; w[6]=w6; w[7]=w7;
+    w[8]=w8; w[9]=w9; w[10]=w10; w[11]=w11; w[12]=w12; w[13]=w13; w[14]=w14; w[15]=w15;
+    for (uint i = 16u; i < 64u; i++) {
+        uint s0 = rotr(w[i-15u], 7u) ^ rotr(w[i-15u], 18u) ^ (w[i-15u] >> 3u);
+        uint s1 = rotr(w[i-2u], 17u) ^ rotr(w[i-2u], 19u) ^ (w[i-2u] >> 10u);
+        w[i] = w[i-16u] + s0 + w[i-7u] + s1;
+    }
+
+    uint a=h[0], b=h[1], c=h[2], d=h[3], e=h[4], f=h[5], g=h[6], hh=h[7];
+    for (uint i = 0u; i < 64u; i++) {
+        uint S1 = rotr(e,6u) ^ rotr(e,11u) ^ rotr(e,25u);
+        uint ch = (e & f) ^ ((~e) & g);
+        uint temp1 = hh + S1 + ch + K[i] + w[i];
+        uint S0 = rotr(a,2u) ^ rotr(a,13u) ^ rotr(a,22u);
+        uint maj = (a & b) ^ (a & c) ^ (b & c);
+        uint temp2 = S0 + maj;
+        hh = g; g = f; f = e; e = d + temp1;
+        d = c; c = b; b = a; a = temp1 + temp2;
+    }
+    h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e; h[5]+=f; h[6]+=g; h[7]+=hh;
+}
+
+// 32バイトメッセージ(8ワード)をSHA-256パディング込みの単一64バイト
+// ブロックとしてハッシュする(メッセージ長は常に32バイト固定なので、
+// パディングは常に同じ構造: msg(8) + 0x80000000 + zeros(5) +
+// length_bits(2、32*8=256 = 0x100)。
+void sha256_32bytes(uint m0, uint m1, uint m2, uint m3, uint m4, uint m5, uint m6, uint m7, out uint h[8]) {
+    h[0]=0x6a09e667u; h[1]=0xbb67ae85u; h[2]=0x3c6ef372u; h[3]=0xa54ff53au;
+    h[4]=0x510e527fu; h[5]=0x9b05688cu; h[6]=0x1f83d9abu; h[7]=0x5be0cd19u;
+    sha256_compress(h, m0, m1, m2, m3, m4, m5, m6, m7,
+                     0x80000000u, 0u, 0u, 0u, 0u, 0u, 0u, 256u);
+}
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= params.count) {
+        return;
+    }
+    uint nonce = params.nonce_base + i;
+
+    // ベースメッセージの先頭ワードへnonceを埋め込む(host側は
+    // base[0]をプレースホルダ0で送る想定)。
+    uint m0 = nonce;
+    uint m1 = base[1];
+    uint m2 = base[2];
+    uint m3 = base[3];
+    uint m4 = base[4];
+    uint m5 = base[5];
+    uint m6 = base[6];
+    uint m7 = base[7];
+
+    uint h1[8];
+    sha256_32bytes(m0, m1, m2, m3, m4, m5, m6, m7, h1);
+
+    uint h2[8];
+    sha256_32bytes(h1[0], h1[1], h1[2], h1[3], h1[4], h1[5], h1[6], h1[7], h2);
+
+    uint base_idx = i * 8u;
+    digests[base_idx+0u]=h2[0]; digests[base_idx+1u]=h2[1];
+    digests[base_idx+2u]=h2[2]; digests[base_idx+3u]=h2[3];
+    digests[base_idx+4u]=h2[4]; digests[base_idx+5u]=h2[5];
+    digests[base_idx+6u]=h2[6]; digests[base_idx+7u]=h2[7];
+}
