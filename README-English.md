@@ -30,19 +30,22 @@ the "技術調査結果" (technical research findings) section of
 [`CLAUDE.md`](CLAUDE.md) for the full breakdown by component technology,
 maturity comparison, and a proposed realistic architecture direction.
 
-## Target platforms (roadmap, in priority order)
+## Target platforms (roadmap, updated 2026-08-06 based on actual hardware on hand)
 
-1. Windows
-2. macOS
-3. Android
-4. Various Linux distributions
-5. (future) Sony PlayStation 5 / PlayStation 6
-6. (future) Nintendo Switch 2
+**Phase 1 (hardware available, starting now)**: Windows (a PC with an
+NVIDIA GT730) and Android (several phones).
 
-**Honest disclosure**: supporting PS5/6 and Switch 2 requires each
-platform holder's non-public SDK, NDA, and dev hardware, none of which
-this ecosystem currently has. This is a stated direction, not a
-committed timeline or confirmed feasibility.
+**Phase 2+ (deferred, pending future licensing/permission)**: macOS/
+iPhone, various Linux distributions, Sony PlayStation 5/6, Nintendo
+Switch 2.
+
+**Honest disclosure**: supporting macOS/iPhone, PS5/6, and Switch 2
+requires each platform holder's non-public SDK, NDA, and dev hardware,
+none of which this ecosystem currently has. Per the user's 2026-08-06
+decision, these are deferred on the premise of obtaining licensing later
+— work starts now with the platforms we actually have hardware for
+(see the "スコープの絞り込み" section of [`CLAUDE.md`](CLAUDE.md) for
+details).
 
 ## Place within the ecosystem
 
