@@ -37,7 +37,11 @@ NVIDIA GT730) and Android (several phones).
 
 **Phase 2+ (deferred, pending future licensing/permission)**: macOS/
 iPhone, various Linux distributions, Sony PlayStation 5/6, Nintendo
-Switch 2.
+Switch 2, and **IBM mainframe (z/OS family) compatibility** (the
+instruction-set emulator Hercules is OSS, but running the actual OS
+requires an official IBM license). "AWS mainframe" turned out to be an
+application-migration service (AWS Mainframe Modernization etc.), not
+an OS compatibility layer — see [`CLAUDE.md`](CLAUDE.md) for details.
 
 **Honest disclosure**: supporting macOS/iPhone, PS5/6, and Switch 2
 requires each platform holder's non-public SDK, NDA, and dev hardware,

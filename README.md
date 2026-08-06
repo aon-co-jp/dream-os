@@ -33,10 +33,15 @@ Android(スマホ数台)。
 
 **フェーズ2以降(将来、ライセンス/許諾取得を前提とした保留)**: macOS/
 iPhone・各種Linuxディストリビューション・SONY PlayStation 5/6・
-Nintendo Switch 2。
+Nintendo Switch 2・**IBMメインフレーム(z/OS系、命令セットエミュレータ
+Hercules自体はOSSだが実OSにはIBM正式ライセンスが必要)**。
+「AWS版メインフレーム」はOS互換レイヤーではなくアプリケーション移行
+支援サービス(AWS Mainframe Modernization等)と判明、詳細は
+[`CLAUDE.md`](CLAUDE.md)参照。
 
-**正直な開示**: macOS/iPhone・PS5/6・Switch2への対応には各社の非公開
-SDK・NDA・実機/開発機材が必須であり、現時点でこのエコシステムに実機・
+**正直な開示**: macOS/iPhone・PS5/6・Switch2・IBMメインフレームへの
+対応には各社の非公開SDK・NDA・実機/開発機材・正式ライセンスが必須で
+あり、現時点でこのエコシステムに実機・
 SDK・開発者ライセンスは一切ありません。「将来ライセンスが取得できたら
 着手する」という前提の保留とし、まずは実機のあるWindows・Androidから
 着手する方針です(詳細は[`CLAUDE.md`](CLAUDE.md)の「スコープの絞り込み」
