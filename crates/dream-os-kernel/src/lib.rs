@@ -17,10 +17,12 @@
 //! Androidの2プラットフォームに限定する(macOS/iPhone・PS5/6・Switch2は
 //! 将来のライセンス取得を前提とした保留)。
 
+pub mod directx_bridge;
 pub mod mining;
 pub mod power_profile;
 pub mod sbm;
 
+pub use directx_bridge::dispatch_dxbc_vector_add;
 pub use mining::{hashrate, MiningBatchResult, MiningWorker};
 pub use power_profile::MiningPowerProfile;
 pub use sbm::{run_sbm_ising, run_sbm_ising_cpu_reference, SbmResult};

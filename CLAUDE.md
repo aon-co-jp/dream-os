@@ -367,6 +367,64 @@ Git Bash〈MSYS〉から`adb.exe`〈ネイティブWindows実行ファイル〉�
   **次回の課題**として、バッチサイズを小さく分割してディスパッチする
   (またはタイムスライシング)設計への変更が必要。
 
+## open-directx連携+aruaru-db永続化を実装(2026-08-06)
+
+ユーザー指示「dream-osをopen-directx・open-cuda・open-web-server・RPoem・
+open-raid-z・aruaru-dbなどをベースに関連技術を実装開発、完成度と連携性の
+向上をして」への対応。2つの具体的な実機検証済みブリッジを実装した。
+
+### open-directx連携(`crates/dream-os-kernel/src/directx_bridge.rs`)
+
+`open-directx`(`directx-shader-translate`、path依存で再利用)のDXBC
+(Windows専用D3D11 Compute Shaderバイトコード、`fxc.exe`実コンパイル済み)
+→SPIR-V翻訳を、dream-os-kernelのVulkan実行基盤へ直接接続した。
+**「Windows専用DirectXコンピュートシェーダーバイナリが、DreamOSの
+Windows/Android共通Vulkan実行層でそのまま動く」ことを実証**——
+open-directx・open-cuda・dream-osの3リポジトリの連携性を具体的な
+コードで示す最初の実装。
+
+**実機検証(NVIDIA GT730)**: `tests/directx_bridge_real_vulkan.rs`——
+open-directx側の実`vector_add.dxbc`(`include_bytes!`で直接取り込み)を
+翻訳・ディスパッチし、256要素すべてCPU参照実装と一致することを確認。
+
+### aruaru-db永続化(`crates/dream-os-wire/src/aruaru_persistence.rs`)
+
+World Laboratory構想(`docs/world-laboratory-design.md`)の通信・永続化層
+(第4層)のうち、これまで「実DBインスタンスが無いため未配線」としていた
+永続化部分を、`aruaru-db`(ACID互換+Git-on-SQLバージョン管理)へ実際に
+接続する形で実装した。`tokio-postgres`で`aruaru-server`(pgwire)へ
+接続し、`WorkResultEnvelope`をINSERT+`aruaru_commit`でコミット、
+バージョン管理されたcommit_idを取得する。
+
+**実機検証**: 実際に`aruaru-server`(既存ビルド済みバイナリ、
+`ARUARU_USERS`環境変数で認証情報設定)をローカルで起動し、
+`tests/aruaru_db_integration.rs`で実接続・INSERT・`aruaru_commit`まで
+一気通貫で検証(`commit_id=95932e6f...`を実際に取得)。
+
+**実機検証で発見した実際の制約(正直な開示)**: `aruaru-query`のSQL
+パーサーは`INSERT ... VALUES(...)`内の値をクォートを考慮しない単純な
+`split(',')`で分割する簡易実装(意図的に絞り込まれたサブセット)。
+そのため`result_json`(JSON文字列)にカンマが含まれると
+`"INSERT: N columns but M values"`エラーになることを実際の接続で
+発見・特定した。dream-os側でBase64エンコードしてから格納する回避策を
+実装(aruaru-db側のパーサー自体は変更していない——影響範囲の広い
+コア変更を避け、呼び出し側での回避を選択)。
+
+**正直な開示・未実装**: (a) `open-web-server`/RPoemとの直接連携(HTTPコ
+ーディネータとしての実配線)は今回未着手——World Laboratory設計文書の
+「フェーズ1」相当。(b) `open-raid-z`との直接連携は、aruaru-db自体が
+既にopen-raid-zとのZFS互換スナップショット連携を持つため
+(`aruaru-dist::raid_z_backend`)、間接的に活用可能だが今回新規のコードは
+書いていない。(c) `aruaru-llm`との連携は今回未着手。
+
+**検証**: `cargo build --workspace --release`/`cargo test --workspace
+--release`で全クレートregression無し。
+
+- 次にすべきこと: (1) World Laboratoryコーディネータ本体(RPoem/
+  open-web-server上への実HTTP API)の実装、(2) aruaru-llmとの連携
+  (World Laboratoryのワークロード種別としてLLM推論タスクを追加)、
+  (3) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
 ## 東芝SBM・DeepSeek・IOWNの調査+東芝SBM(量子アニーリング風最適化)の実装(2026-08-06)
 
 ユーザー指示「東芝の擬似的な量子コンピューター技術で富士通より普通の

@@ -36,15 +36,24 @@
 //!   ワーカーは家庭のPC/スマホ(不安定な回線が前提)であり、複数伝送路の
 //!   同時活用は将来的に有効な可能性があるが、今回はまず「1本の安全な
 //!   経路」を確立することを優先した。
-//! - **4重DB永続化(PostgreSQL/aruaru-db/マルチリージョン同期/独立監査
-//!   ログ)**: `open-web-server-ledger`(`PostgresWal`・
-//!   `MultiRegionReplicator`・`audit_log`)は、実PostgreSQL/aruaru-db
-//!   インスタンスへの到達が必要で、このマシンには無い(`open-web-server`
-//!   側のCLAUDE.mdにも同じ制約が記録済み)。World Laboratoryが実際に
-//!   大量の結果を永続化する段階(フェーズ2以降)で、`open-web-server-
+//! - **aruaru-db永続化(2026-08-06実装・実機検証済み)**: `aruaru_
+//!   persistence`モジュールが`aruaru-server`(pgwire)へ`tokio-postgres`
+//!   で接続し、`WorkResultEnvelope`をテーブルへINSERT+`aruaru_commit`で
+//!   コミットする。ACID互換のトランザクション性+Git-on-SQLのバージョン
+//!   管理(commit_id)の両方を実際に活用した永続化。詳細は
+//!   `aruaru_persistence`モジュールdoc参照。
+//! - **4重DB永続化のうちPostgreSQL/マルチリージョン同期/独立監査ログ**:
+//!   `open-web-server-ledger`(`PostgresWal`・`MultiRegionReplicator`・
+//!   `audit_log`)は引き続き未配線(aruaru-db以外の3系統は今回のスコープ
+//!   外)。World Laboratoryが実際に大量の結果を永続化する段階
+//!   (フェーズ2以降)で、`open-web-server-
 //!   ledger`をコーディネータ側の永続化層としてそのままpath依存で
 //!   再利用する設計方針だけを`world-laboratory-design.md`へ追記した
 //!   (コードの実配線は次回以降)。
+
+pub mod aruaru_persistence;
+
+pub use aruaru_persistence::AruaruDbStore;
 
 use anyhow::{Context, Result};
 use open_web_server_wire::replay_guard::SecureChannel;

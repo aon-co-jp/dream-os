@@ -30,32 +30,47 @@ dream-os/
                            # Windows/Android共通実行基盤+電力出力調整可能な
                            # マイニングOS向けデューティサイクル制御
         ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
-        ├── src/{lib,power_profile,mining,sbm}.rs
+        ├── src/{lib,power_profile,mining,sbm,directx_bridge}.rs
         ├── shaders/{vector_add,sha256d_mine,sbm_ising}.{comp,spv}
         ├── examples/{dispatch_throttled,mine_benchmark}.rs
-        └── tests/{mining_real_vulkan,sbm_real_vulkan}.rs
-    └── dream-os-wire/  # World Laboratory向け通信層(open-web-server-wire
-                          # のSecureChannel再利用、AEAD暗号化+リプレイ対策)
+        └── tests/{mining_real_vulkan,sbm_real_vulkan,directx_bridge_real_vulkan}.rs
+        # directx_bridge.rsは../../../open-directx/crates/
+        # directx-shader-translate へのpath依存を追加で持つ
+    └── dream-os-wire/  # World Laboratory向け通信・永続化層
+        │                # (open-web-server-wireのSecureChannel再利用=
+        │                # AEAD暗号化+リプレイ対策、aruaru-db永続化)
         ├── Cargo.toml   # ../../../open-web-server/crates/open-web-server-*
-        │                # へのpath依存(さらにopen-web-server-wireは
+        │                # (さらにopen-web-server-wireは
         │                # ../../../RS-SmartTCPへのpath依存を持つ)
-        ├── src/lib.rs
-        └── tests/secure_channel_integration.rs
+        ├── src/{lib,aruaru_persistence}.rs
+        └── tests/{secure_channel_integration,aruaru_db_integration}.rs
+        # aruaru_db_integration.rsはDREAM_OS_ARUARU_PG_CONN環境変数で
+        # 指定したaruaru-server(pgwire)インスタンスへの実接続が必要
+        # (未設定/到達不能時は正直にスキップする設計)
 ```
 
 `crates/dream-os-kernel`は`open-cuda`(`../../open-cuda`、同じ`F:\runo`
-直下にcloneされている前提)へのpath依存を持つ。`crates/dream-os-wire`は
-`open-web-server`(`../../../open-web-server`)へのpath依存を持ち、
-さらに`open-web-server-wire`自体が`RS-SmartTCP`(`../../../RS-SmartTCP`、
-`open-web-server`から見た相対位置)へのpath依存を持つ。移設する場合は
-`open-cuda`・`open-web-server`・`RS-SmartTCP`をすべて同じ相対位置関係で
-cloneしておくこと。 / `crates/dream-os-kernel` has a path dependency on
-`open-cuda` (`../../open-cuda`, assumed cloned alongside this repo under
-`F:\runo`). `crates/dream-os-wire` has a path dependency on
+直下にcloneされている前提)・`open-directx`(`../../open-directx`、
+同様)の2つへのpath依存を持つ。`crates/dream-os-wire`は`open-web-server`
+(`../../../open-web-server`)へのpath依存を持ち、さらに
+`open-web-server-wire`自体が`RS-SmartTCP`(`../../../RS-SmartTCP`、
+`open-web-server`から見た相対位置)へのpath依存を持つ。`dream-os-wire`の
+`aruaru_persistence`モジュールは実行時に`aruaru-db`(`aruaru-server`
+バイナリ、pgwire)への接続を必要とする(path依存ではなくネットワーク
+接続、`DREAM_OS_ARUARU_PG_CONN`環境変数で接続先を指定)。移設する場合は
+`open-cuda`・`open-directx`・`open-web-server`・`RS-SmartTCP`をすべて
+同じ相対位置関係でcloneしておくこと。 / `crates/dream-os-kernel` has path
+dependencies on `open-cuda` (`../../open-cuda`, assumed cloned alongside
+this repo under `F:\runo`) and `open-directx` (`../../open-directx`,
+likewise). `crates/dream-os-wire` has a path dependency on
 `open-web-server` (`../../../open-web-server`), which in turn has a path
 dependency on `RS-SmartTCP` (`../../../RS-SmartTCP`, relative to
-`open-web-server`). When relocating, keep `open-cuda`, `open-web-server`,
-and `RS-SmartTCP` all cloned at the same relative positions.
+`open-web-server`). `dream-os-wire`'s `aruaru_persistence` module needs a
+runtime network connection to `aruaru-db` (the `aruaru-server` binary,
+via pgwire) rather than a path dependency — configured via the
+`DREAM_OS_ARUARU_PG_CONN` env var. When relocating, keep `open-cuda`,
+`open-directx`, `open-web-server`, and `RS-SmartTCP` all cloned at the
+same relative positions.
 
 ## 2. VPS/ローカルとの対応 / Local & VPS locations
 
