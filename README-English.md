@@ -8,10 +8,27 @@ this project within the ecosystem.
 
 ## Purpose
 
-An application service layer / GPU abstraction layer targeting Windows,
-macOS, Android, and various Linux distributions. Future goals include
-support for **Sony PlayStation 5 / PlayStation 6 and Nintendo Switch 2**
-(direction set by the user on 2026-08-06).
+A **hybrid kernel combining Linux and TRON OS**, aiming to unify most of
+the operating systems that exist in the world. The end goal is for
+Windows PowerShell, macOS/iPhone apps, and Android apps to all run with
+their respective compatibility preserved on a single kernel. Future goals
+also include support for **Sony PlayStation 5 / PlayStation 6 and
+Nintendo Switch 2** (direction set by the user on 2026-08-06).
+
+## Technical research (conducted 2026-08-06, honest summary)
+
+A Google/GitHub research pass in Japanese and English found **no existing
+implementation that achieves "a Linux×TRON hybrid kernel natively running
+apps from every platform" as originally envisioned**. The most important
+finding: **there is currently no practical way, as of 2026, to run iOS
+apps natively on non-Apple hardware** (Apple itself blocks JIT
+compilation and virtualization for third-party apps at the OS level).
+On the other hand, ChromeOS's approach — hosting multiple guest OSes
+(Linux via Crostini, Android via ARCVM) on a shared VMM foundation
+(`crosvm`) — turned out to be the most proven, realistic precedent. See
+the "技術調査結果" (technical research findings) section of
+[`CLAUDE.md`](CLAUDE.md) for the full breakdown by component technology,
+maturity comparison, and a proposed realistic architecture direction.
 
 ## Target platforms (roadmap, in priority order)
 
