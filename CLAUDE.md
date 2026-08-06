@@ -367,6 +367,96 @@ Git Bash〈MSYS〉から`adb.exe`〈ネイティブWindows実行ファイル〉�
   **次回の課題**として、バッチサイズを小さく分割してディスパッチする
   (またはタイムスライシング)設計への変更が必要。
 
+## 東芝SBM・DeepSeek・IOWNの調査+東芝SBM(量子アニーリング風最適化)の実装(2026-08-06)
+
+ユーザー指示「東芝の擬似的な量子コンピューター技術で富士通より普通の
+グラフィックボード一枚のPCの方が100倍高性能…DeepSeekのグラフィック
+ボード数千枚のシステムをグラフィックボード一枚のPCに凝縮、圧縮する
+折りたたみ技術や4層通信構成通信にIOWNの通信技術を…調査して、取り込んで」
+への対応。日英でGoogle/GitHub再調査を実施。
+
+### 1. 東芝SBM(Simulated Bifurcation Machine) — 実在・実装した
+
+2026年4月、東芝は前世代比10〜100倍高速化の新アルゴリズムを発表、
+16GPU構成で100万変数問題を約30分(CPU版シミュレーテッドアニーリングの
+約20,000倍高速)で解いたと報告([東芝公式](https://digitalpr.jp/r/44929)、
+[EE Times Japan](https://eetimes.itmedia.co.jp/ee/articles/2604/09/news036.html)、
+[IEEE Spectrum](https://spectrum.ieee.org/toshiba--optimization-algorithm-speed-record-combinatorial-problems))。
+富士通デジタルアニーラは専用ASICで超高速だが変数数8,192までの制約があり、
+東芝SBMはGPU上で10万変数以上の大規模問題に対応できる——「グラフィック
+ボード1枚が専用ASICに対して優位性を持ちうる」という報道の技術的背景を
+確認できた(ただし比較条件〈問題規模・世代〉に強く依存する点は要注意)。
+
+**実装**: SBMの核心アルゴリズムであるballistic Simulated Bifurcation
+(bSB、Goto et al. 2019)を`shaders/sbm_ising.comp`(新規)として実際に
+Vulkan Compute上へ実装した(64スピンのIsing模型、1ワークグループ内の
+共有メモリでx/y状態を保持し`barrier()`で同期しながら時間発展)。
+open-cuda側にも`sbm_ising`カーネルのディスパッチ経路を追加(既存の
+`ensure_*_args`/`run_*_spirv`パターンを踏襲)。`crates/dream-os-kernel/
+src/sbm.rs`(新規)にGPU実行関数+CPU参照実装(全く同じ更新式の逐次計算)
+を実装。
+
+**実機検証(NVIDIA GT730)**: `tests/sbm_real_vulkan.rs`——64スピンの
+ランダムIsing問題(決定的な擬似乱数で生成)を解き、**GPU版とCPU参照
+実装が完全に同一のスピン配置(64/64一致)へ収束すること**を確認
+(`cargo test --release --test sbm_real_vulkan`)。`cargo test --workspace
+--release`で全クレートregression無し。
+
+**正直な開示**: 「100倍高性能」を主張するものではない——今回のPoCは
+64スピンの小規模問題を解く最小実装であり、東芝の商用実装(SQBM+、
+離散化アルゴリズムdSB・FPGA対応・100万変数規模)との性能比較は
+行っていない。詳細・出典は`crates/dream-os-kernel/src/sbm.rs`の
+モジュールdoc参照。
+
+### 2. DeepSeekの「数千枚のGPUを1枚に凝縮・圧縮する折りたたみ技術」— 調査の結果、そのような技術は確認できなかった(正直な訂正)
+
+日英で再調査したが、**「数千枚のGPUのシステムを1枚のGPUへ物理的/
+論理的に折りたたむ・凝縮する技術」という報道・技術文書は見つからなかった**。
+実際にDeepSeek関連で確認できたのは以下——性質の異なる話であることを
+正直に整理する:
+
+- DeepSeekの公式発表では、V3モデルの学習に2,048台のNVIDIA H800 GPU・
+  278万GPU時間・推定580万ドルを要したとされる([BytePlus](https://www.byteplus.com/en/topic/409182))。
+- 一方、SemiAnalysis等の独立系分析では、実際には最大5万台規模のGPU
+  (16億ドル相当のインフラ投資)を保有しているとの指摘もあり、公式発表と
+  実態には論争がある([Tom's Hardware](https://www.tomshardware.com/tech-industry/artificial-intelligence/deepseek-might-not-be-as-disruptive-as-claimed-firm-reportedly-has-50-000-nvidia-gpus-and-spent-usd1-6-billion-on-buildouts))。
+  いずれにせよ「数千枚を1枚に圧縮した」という主張ではない。
+- DeepSeekが実際に開発した効率化技術は**MLA(Multi-Head Latent
+  Attention)**——推論時のKVキャッシュのメモリ使用量を圧縮する
+  アーキテクチャ上の工夫であり、「物理的なGPUの台数を減らす」ものでは
+  なく「1台あたりのメモリ効率を上げる」技術。この方向性自体は
+  `open-cuda`が既に持つINT4/INT8/AWQ量子化(`opencuda-blas`、
+  実装・検証済み)と概念的に同じ系統(メモリ効率化によるハードウェア
+  要求の軽減)であり、**DreamOSとして新たに追加実装すべき固有の技術は
+  見つからなかった**——既存のopen-cuda量子化機能がこの方向性の実装と
+  して既に存在する、という結論とする。
+- 次にすべきこと: 特になし(調査の結果、実装対象と呼べる具体的な技術が
+  見つからなかったため)。もしユーザーが指す情報源(特定の記事URL等)が
+  あれば、それを教えていただければ再調査する。
+
+### 3. IOWN(NTTのオールフォトニクスネットワーク) — 物理インフラのため直接実装は不可、既存のRS-SmartTCP設計を再確認
+
+IOWN/APN(オールフォトニクス・ネットワーク)は、NTTが構築する光ベースの
+物理通信インフラであり、2023年3月にIOWN 1.0(100Gbps専用線サービス)が
+提供開始されている([NTT Group](https://group.ntt/jp/group/iown/function/apn.html))。
+GitHub上の実装や、ソフトウェアとして再現可能な技術ではない
+(物理層の光ネットワーク設備そのもの)。
+
+**このエコシステムでの既存の扱い**(`open-web-server`側で既に調査・
+実装済み、今回新たに確認): `RS-SmartTCP`が「IOWN/APNのような超低
+遅延・ジッター無し回線を検知した際にリトライ間隔等を積極化する適応
+制御」として、IOWN自体ではなくIOWNが実現する回線特性に**適応する
+ソフトウェア側の設計**を既に持っている(RTT/ジッター推定を
+RFC 6298/RFC 9002と同じSRTT/RTTVAR方式で行う)。dream-os-wireの
+将来の4重伝送路対応(今回未実装)でも、この既存のRS-SmartTCP設計を
+再利用する方針を`docs/world-laboratory-design.md`へ追記した——
+IOWN自体を「実装」することはできないが、IOWNのような低遅延回線が
+将来利用可能になった際に自動的に活かせる適応制御という形で、
+間接的に「取り込む」ことは可能という結論。
+- 次にすべきこと: 実際にdream-os-wireへ複数伝送路対応を実装する際
+  (World Laboratory設計文書フェーズ2以降)、RS-SmartTCPをpath依存で
+  再利用する。
+
 ## World Laboratory構想: 通信・永続化層(第4層)を3層から4層へ拡張・実装(2026-08-06)
 
 ユーザー指示「open-web-server・RPoem・open-raid-z・aruaru-dbのACID

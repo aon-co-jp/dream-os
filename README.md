@@ -1,8 +1,10 @@
 # DreamOS (dream-os)
 
-**構想段階のプロジェクトです。現時点でコードは一切存在しません。**
-この`README.md`・[`CLAUDE.md`](CLAUDE.md)・[`PORTING.md`](PORTING.md)は、
-目的・スコープ・エコシステム内での位置づけを文書化するための構想メモです。
+**構想段階のプロジェクトですが、2026-08-06より実機検証済みのPoC
+(概念実証)コードが複数存在します。** この`README.md`・
+[`CLAUDE.md`](CLAUDE.md)・[`PORTING.md`](PORTING.md)・
+[`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)で
+目的・スコープ・エコシステム内での位置づけ・実装状況を文書化しています。
 
 ## 目的
 
@@ -47,6 +49,33 @@ SDK・開発者ライセンスは一切ありません。「将来ライセン�
 着手する方針です(詳細は[`CLAUDE.md`](CLAUDE.md)の「スコープの絞り込み」
 節参照)。
 
+## 実装済みPoC(2026-08-06、実機検証済み)
+
+`crates/dream-os-kernel`(`open-cuda`の`opencuda-vulkan`を再利用):
+
+- **Windows/Android共通のVulkan実行基盤**: `vector_add`カーネルを
+  Windows実機(NVIDIA GT730)・Android実機(Moto G53Y 5G、Adreno 619)
+  双方で実際にディスパッチし動作確認済み。
+- **電力出力調整可能なマイニングOS向け機能**: `MiningPowerProfile`
+  (ソフトウェア側デューティサイクル制御)+`sha256d_mine`カーネル
+  (double-SHA256)。GPU計算結果がCPU参照実装(`sha2`クレート)と完全
+  一致することをWindows/Android両実機で確認。Android実機でのモバイル
+  GPUドライバのタイムアウト(TDR)対策としてバッチ分割設計を実装。
+- **東芝Simulated Bifurcation Machine(SBM)にインスパイアされた量子
+  アニーリング風組合せ最適化**: `sbm_ising`カーネル(ballistic SB
+  アルゴリズム、Ising模型の最小化)。GPU版とCPU参照実装が完全に同一の
+  スピン配置へ収束することをWindows実機で確認。
+
+`crates/dream-os-wire`(`open-web-server-wire`のSecureChannelを再利用):
+
+- **World Laboratory構想(BOINC型の分散ボランティアコンピューティング)
+  向けの結果送信保護**: AEAD暗号化+リプレイ攻撃対策で、ワーカーが送る
+  計算結果の改ざん・リプレイを検知・拒否する`WorkerChannel`/
+  `CoordinatorChannel`。正常送受信・リプレイ攻撃・改ざん結果、3つの
+  シナリオを実際の暗号処理で検証済み。詳細な設計は
+  [`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)
+  参照。
+
 ## エコシステム内での位置づけ
 
 このプロジェクトは`aon-co-jp`エコシステムの一部で、特に以下と関連します
@@ -63,10 +92,10 @@ SDK・開発者ライセンスは一切ありません。「将来ライセン�
 
 ## 現状
 
-構想フェーズのみ。コード・ビルド設定・CI等は一切ありません。
-まずopen-directxの完成度向上を通じて実証を積んでから、DreamOSの
-具体的な技術スコープを固める方針です(詳細は[`CLAUDE.md`](CLAUDE.md)の
-HANDOFF参照)。
+上記PoCコードは実機検証済みですが、DreamOS本体(統合カーネル・
+コーディネータ本体)はまだ構想・設計段階です。open-directxの完成度向上を
+最優先方針としつつ、dream-osは小さく検証可能な単位で育てています
+(詳細は[`CLAUDE.md`](CLAUDE.md)のHANDOFF参照)。
 
 ## 関連プロジェクト
 

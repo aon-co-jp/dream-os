@@ -1,10 +1,13 @@
 # DreamOS (dream-os)
 
-**This project is at the concept stage. No code exists yet.**
-This `README-English.md` — along with [`README.md`](README.md) (Japanese,
-the primary language for this ecosystem), [`CLAUDE.md`](CLAUDE.md), and
-[`PORTING.md`](PORTING.md) — documents the purpose, scope, and place of
-this project within the ecosystem.
+**This project is at the concept stage, but since 2026-08-06 it contains
+several real-hardware-verified proof-of-concept code.** This
+`README-English.md` — along with [`README.md`](README.md) (Japanese, the
+primary language for this ecosystem), [`CLAUDE.md`](CLAUDE.md),
+[`PORTING.md`](PORTING.md), and
+[`docs/world-laboratory-design.md`](docs/world-laboratory-design.md) —
+documents the purpose, scope, place within the ecosystem, and current
+implementation status of this project.
 
 ## Purpose
 
@@ -51,6 +54,36 @@ decision, these are deferred on the premise of obtaining licensing later
 (see the "スコープの絞り込み" section of [`CLAUDE.md`](CLAUDE.md) for
 details).
 
+## Implemented PoCs (2026-08-06, real-hardware verified)
+
+`crates/dream-os-kernel` (reuses `open-cuda`'s `opencuda-vulkan`):
+
+- **Shared Windows/Android Vulkan execution backend**: the `vector_add`
+  kernel was actually dispatched and verified on both a Windows PC
+  (NVIDIA GT730) and a real Android phone (Moto G53Y 5G, Adreno 619).
+- **Mining-OS-style power output control**: `MiningPowerProfile`
+  (software-side duty-cycle throttling) + a `sha256d_mine` kernel
+  (double-SHA256). GPU results were verified byte-for-byte against a
+  CPU reference (the `sha2` crate) on both Windows and Android hardware.
+  A batch-splitting design was added to work around a mobile GPU
+  driver timeout (TDR) discovered on the real Android device.
+- **Toshiba Simulated Bifurcation Machine (SBM)-inspired quantum-
+  annealing-style combinatorial optimization**: an `sbm_ising` kernel
+  (the ballistic SB algorithm, minimizing an Ising model). Verified on
+  real Windows hardware that the GPU run converges to the exact same
+  spin configuration as a CPU reference implementation.
+
+`crates/dream-os-wire` (reuses `open-web-server-wire`'s `SecureChannel`):
+
+- **Result-submission protection for the World Laboratory concept**
+  (BOINC-style volunteer distributed computing): AEAD encryption +
+  replay-attack protection via `WorkerChannel`/`CoordinatorChannel`,
+  detecting and rejecting tampered or replayed worker results. Verified
+  with three real cryptographic test scenarios (normal round-trip,
+  replay rejection, tamper rejection). See
+  [`docs/world-laboratory-design.md`](docs/world-laboratory-design.md)
+  for the full design.
+
 ## Place within the ecosystem
 
 Part of the `aon-co-jp` ecosystem, related in particular to (exact
@@ -69,10 +102,11 @@ details):
 
 ## Current status
 
-Concept stage only — no code, build config, or CI yet. The plan is to
-build evidence through open-directx's ongoing completeness work first,
-then define DreamOS's concrete technical scope (see the HANDOFF section
-of [`CLAUDE.md`](CLAUDE.md) for details).
+The PoCs above are real-hardware verified, but DreamOS itself (the
+unified kernel, the coordinator) is still at the concept/design stage.
+open-directx's completeness remains the top priority, with dream-os
+grown in small, independently verifiable increments alongside it (see
+the HANDOFF section of [`CLAUDE.md`](CLAUDE.md) for details).
 
 ## Related projects
 

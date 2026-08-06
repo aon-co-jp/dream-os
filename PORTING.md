@@ -30,10 +30,10 @@ dream-os/
                            # Windows/Android共通実行基盤+電力出力調整可能な
                            # マイニングOS向けデューティサイクル制御
         ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
-        ├── src/{lib,power_profile,mining}.rs
-        ├── shaders/{vector_add,sha256d_mine}.{comp,spv}
+        ├── src/{lib,power_profile,mining,sbm}.rs
+        ├── shaders/{vector_add,sha256d_mine,sbm_ising}.{comp,spv}
         ├── examples/{dispatch_throttled,mine_benchmark}.rs
-        └── tests/mining_real_vulkan.rs
+        └── tests/{mining_real_vulkan,sbm_real_vulkan}.rs
     └── dream-os-wire/  # World Laboratory向け通信層(open-web-server-wire
                           # のSecureChannel再利用、AEAD暗号化+リプレイ対策)
         ├── Cargo.toml   # ../../../open-web-server/crates/open-web-server-*

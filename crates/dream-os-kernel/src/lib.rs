@@ -19,9 +19,11 @@
 
 pub mod mining;
 pub mod power_profile;
+pub mod sbm;
 
 pub use mining::{hashrate, MiningBatchResult, MiningWorker};
 pub use power_profile::MiningPowerProfile;
+pub use sbm::{run_sbm_ising, run_sbm_ising_cpu_reference, SbmResult};
 
 use std::sync::Arc;
 use std::time::Instant;

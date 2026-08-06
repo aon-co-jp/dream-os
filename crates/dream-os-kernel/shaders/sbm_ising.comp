@@ -1,0 +1,81 @@
+#version 450
+
+// 東芝のSimulated Bifurcation Machine(SBM)にインスパイアされた、
+// 量子アニーリング風の組合せ最適化カーネル(2026-08-06追加)。
+// Goto et al. "Combinatorial optimization by simulating adiabatic
+// bifurcations in nonlinear Hamiltonian systems"(2019)のballistic SB
+// (bSB)アルゴリズムを、1ワークグループ=1つのIsing問題インスタンスとして
+// GPU上で時間発展させる。スピン数はこのPoCでは64に固定(1ワークグループ
+// 内の共有メモリでx/y状態を保持し、ステップごとに`barrier()`で全スレッド
+// を同期しながら反復する設計——単一ディスパッチ内でN時間ステップ全てを
+// 完結させる)。
+
+#define NUM_SPINS 64
+
+layout(local_size_x = NUM_SPINS, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) readonly buffer JMatrix {
+    // J[i*NUM_SPINS+j]: スピンiとjの結合強度(対称行列、対角成分は0を想定)。
+    float j_matrix[];
+};
+
+layout(set = 0, binding = 1) readonly buffer InitX {
+    // 各スピンの初期位置(ホスト側で決定的な擬似乱数から生成、
+    // CPU参照実装と全く同じ初期値を使うことでGPU/CPUの軌道を一致させる)。
+    float init_x[];
+};
+
+layout(set = 0, binding = 2) writeonly buffer OutSpins {
+    // 最終的なスピン値(+1.0または-1.0)。
+    float out_spins[];
+};
+
+layout(push_constant) uniform Params {
+    uint steps;
+    float dt;
+    float c0;
+    float a0;
+} params;
+
+shared float x[NUM_SPINS];
+shared float y[NUM_SPINS];
+
+void main() {
+    uint i = gl_LocalInvocationID.x;
+    x[i] = init_x[i];
+    y[i] = 0.0;
+    barrier();
+
+    for (uint step = 0u; step < params.steps; step++) {
+        // 断熱的パラメータa(t)を0からa0まで線形にランプさせる
+        // (adiabatic evolution、SBMの核心となる断熱変化の模倣)。
+        float a_t = params.a0 * (float(step) / float(params.steps));
+
+        // 結合項: sum_j J[i,j] * x[j] (全スピン共有メモリから読み取り、
+        // ワークグループ内で完結するため追加のバッファ往復が不要)。
+        float coupling = 0.0;
+        for (uint j = 0u; j < NUM_SPINS; j++) {
+            coupling += j_matrix[i * NUM_SPINS + j] * x[j];
+        }
+
+        float y_new = y[i] + (-(params.a0 - a_t) * x[i] + params.c0 * coupling) * params.dt;
+        float x_new = x[i] + params.a0 * y_new * params.dt;
+
+        // ballistic wall: |x|>1ならスピンを確定させ運動量をゼロにする
+        // (bSBアルゴリズムの特徴的な反射境界条件)。
+        if (x_new > 1.0) {
+            x_new = 1.0;
+            y_new = 0.0;
+        } else if (x_new < -1.0) {
+            x_new = -1.0;
+            y_new = 0.0;
+        }
+
+        barrier();
+        x[i] = x_new;
+        y[i] = y_new;
+        barrier();
+    }
+
+    out_spins[i] = (x[i] >= 0.0) ? 1.0 : -1.0;
+}
