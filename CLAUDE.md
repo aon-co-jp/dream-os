@@ -367,6 +367,45 @@ Git Bash〈MSYS〉から`adb.exe`〈ネイティブWindows実行ファイル〉�
   **次回の課題**として、バッチサイズを小さく分割してディスパッチする
   (またはタイムスライシング)設計への変更が必要。
 
+## World Laboratory構想: 通信・永続化層(第4層)を3層から4層へ拡張・実装(2026-08-06)
+
+ユーザー指示「open-web-server・RPoem・open-raid-z・aruaru-dbのACID
+互換・ZFS互換の4層4重通信の技術もdream-osに実装、移植して」+
+「もう一度Google検索とGithub調査を日本語と英語でして」への対応。
+
+**再調査結果**: BOINC自体は暗号学的な改ざん検知・リプレイ対策を標準
+機構として持たず、「複製配布(同一ジョブを複数の無関係なPCへ)+多数決」
+が結果検証の主軸であることを確認([BOINC Wiki: SecurityIssues](https://github.com/BOINC/boinc/wiki/SecurityIssues))。
+一方、AEAD+シーケンス番号によるアンチリプレイ(ASN技術)は業界標準
+パターンと確認でき、これは`open-web-server-wire::SecureChannel`が既に
+実装している設計と完全に一致した。この裏付けを踏まえ、`docs/
+world-laboratory-design.md`のアーキテクチャを3層から4層(コーディネータ/
+**通信・永続化層〈新設〉**/ワーカー/実行基盤)へ拡張。
+
+**実装(設計文書だけに留めず、実際にコードを書いて実機検証)**:
+新規`crates/dream-os-wire`(`open-web-server`〈path依存、
+`open-web-server-wire`のSecureChannel再利用〉+`open-web-server-core`)。
+`WorkResultEnvelope`+`WorkerChannel::submit()`/
+`CoordinatorChannel::receive()`という薄いラッパーで、ワーカー→
+コーディネータ間の計算結果送信をAEAD暗号化+リプレイ対策で保護する。
+`tests/secure_channel_integration.rs`(3件全green): (1) 正常送受信の
+往復一致、(2) **同一結果フレームのリプレイ拒否**(多数決の不正水増し
+攻撃を模擬)、(3) **改ざんされた結果フレームの拒否**(AEADタグ検証で
+復号自体が失敗、でっち上げた偽の計算結果を防ぐ)。`cargo build
+--workspace --release`/`cargo test --workspace --release`で全クレート
+regression無し。
+
+**正直な開示・実装しなかったもの**: (a) 4重伝送路(TCP/UDP/QUIC/MPTCP、
+`open-web-server-wire`に既存)は今回配線せずペイロード層のみ、(b) 4重DB
+永続化(PostgreSQL/aruaru-db/マルチリージョン同期/独立監査ログ、
+`open-web-server-ledger`)は実DBインスタンスが無いため配線せず設計方針
+記録のみ、(c) TLS終端・相互認証(第1層・第2層)は将来のコーディネータ
+実装側が担う想定で未検証。
+- 次にすべきこと: (1) コーディネータ本体(RPoem/open-web-server上への
+  実HTTP APIとしてのワークユニット配布・複製配布N-of-M実装)、
+  (2) `open-web-server-ledger`の実配線(実DBインスタンス確保後)、
+  (3) open-directxの完成度向上が優先方針のため、本格実装は次回以降。
+
 ## A. Androidバッチ分割修正(2026-08-06、実機で`device lost`を解消)
 
 前節で発見した「Android実機で2バッチ目に`vkQueueSubmit failed: The

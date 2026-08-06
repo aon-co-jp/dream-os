@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/dream-os-kernel"]
+members = ["crates/dream-os-kernel", "crates/dream-os-wire"]
 
 [workspace.package]
 version = "0.1.0"

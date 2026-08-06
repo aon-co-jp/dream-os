@@ -34,14 +34,28 @@ dream-os/
         ├── shaders/{vector_add,sha256d_mine}.{comp,spv}
         ├── examples/{dispatch_throttled,mine_benchmark}.rs
         └── tests/mining_real_vulkan.rs
+    └── dream-os-wire/  # World Laboratory向け通信層(open-web-server-wire
+                          # のSecureChannel再利用、AEAD暗号化+リプレイ対策)
+        ├── Cargo.toml   # ../../../open-web-server/crates/open-web-server-*
+        │                # へのpath依存(さらにopen-web-server-wireは
+        │                # ../../../RS-SmartTCPへのpath依存を持つ)
+        ├── src/lib.rs
+        └── tests/secure_channel_integration.rs
 ```
 
 `crates/dream-os-kernel`は`open-cuda`(`../../open-cuda`、同じ`F:\runo`
-直下にcloneされている前提)へのpath依存を持つため、移設する場合は
-`open-cuda`も同じ相対位置関係でcloneしておくこと。 / `crates/
-dream-os-kernel` has a path dependency on `open-cuda` (`../../open-cuda`,
-assumed cloned alongside this repo under `F:\runo`) — when relocating,
-keep `open-cuda` cloned at the same relative position.
+直下にcloneされている前提)へのpath依存を持つ。`crates/dream-os-wire`は
+`open-web-server`(`../../../open-web-server`)へのpath依存を持ち、
+さらに`open-web-server-wire`自体が`RS-SmartTCP`(`../../../RS-SmartTCP`、
+`open-web-server`から見た相対位置)へのpath依存を持つ。移設する場合は
+`open-cuda`・`open-web-server`・`RS-SmartTCP`をすべて同じ相対位置関係で
+cloneしておくこと。 / `crates/dream-os-kernel` has a path dependency on
+`open-cuda` (`../../open-cuda`, assumed cloned alongside this repo under
+`F:\runo`). `crates/dream-os-wire` has a path dependency on
+`open-web-server` (`../../../open-web-server`), which in turn has a path
+dependency on `RS-SmartTCP` (`../../../RS-SmartTCP`, relative to
+`open-web-server`). When relocating, keep `open-cuda`, `open-web-server`,
+and `RS-SmartTCP` all cloned at the same relative positions.
 
 ## 2. VPS/ローカルとの対応 / Local & VPS locations
 
