@@ -5,7 +5,7 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use dream_os_kernel::mining::{hashrate, MiningWorker, DEFAULT_BATCH_SIZE};
+use dream_os_kernel::mining::{hashrate, MiningWorker, DEFAULT_BATCH_SIZE, MOBILE_SUB_BATCH_SIZE};
 use dream_os_kernel::{open_device, MiningPowerProfile};
 
 fn main() -> Result<()> {
@@ -19,14 +19,22 @@ fn main() -> Result<()> {
     let device = open_device(0)?;
     let worker = MiningWorker::new(device, spirv);
     println!("device: {}", worker.device_name());
-    println!("mining power profile: {power_percent}% ({batches} batches x {DEFAULT_BATCH_SIZE} hashes)");
+
+    // モバイルGPUドライバ(Android実機、Adreno 619で実際にTDRが発生した
+    // 実績あり)向けに、Androidターゲットビルドでは小さいサブバッチへ
+    // 自動分割する。デスクトップ(Windows等)ではこれまで通り
+    // DEFAULT_BATCH_SIZEを1回のディスパッチで使う。
+    let sub_batch_size = if cfg!(target_os = "android") { MOBILE_SUB_BATCH_SIZE } else { DEFAULT_BATCH_SIZE };
+    println!(
+        "mining power profile: {power_percent}% ({batches} batches x {DEFAULT_BATCH_SIZE} hashes, sub_batch={sub_batch_size})"
+    );
 
     let profile = MiningPowerProfile::new(power_percent);
     let base_message = [0u32, 0xdeadbeef, 0x12345678, 0, 0, 0, 0, 0];
     let mut nonce_base = 0u32;
 
     for batch in 0..batches {
-        let result = worker.mine_batch(base_message, nonce_base, DEFAULT_BATCH_SIZE)?;
+        let result = worker.mine_batch_split(base_message, nonce_base, DEFAULT_BATCH_SIZE, sub_batch_size)?;
         nonce_base = nonce_base.wrapping_add(DEFAULT_BATCH_SIZE);
         let rate = hashrate(result.hashes, result.elapsed);
         println!("  batch {batch}: {} hashes in {:?} ({:.2} MH/s)", result.hashes, result.elapsed, rate / 1e6);

@@ -367,6 +367,37 @@ Git Bash〈MSYS〉から`adb.exe`〈ネイティブWindows実行ファイル〉�
   **次回の課題**として、バッチサイズを小さく分割してディスパッチする
   (またはタイムスライシング)設計への変更が必要。
 
+## A. Androidバッチ分割修正(2026-08-06、実機で`device lost`を解消)
+
+前節で発見した「Android実機で2バッチ目に`vkQueueSubmit failed: The
+logical device has been lost`」を修正した。`mining.rs`に
+`MOBILE_SUB_BATCH_SIZE`(16,384ハッシュ/ディスパッチ)+
+`MiningWorker::mine_batch_split()`(大きな`total_count`を
+`sub_batch_size`単位に分割して繰り返しディスパッチ、結果を結合)を
+追加。`examples/mine_benchmark.rs`は`cfg!(target_os = "android")`で
+Androidビルド時のみ自動的にサブバッチ分割を使うよう変更(デスクトップは
+従来通り`DEFAULT_BATCH_SIZE`を1回のディスパッチで使う、性能を落とさない)。
+
+**実機再検証(Android、Moto G53Y 5G、Adreno 619)**: `cargo ndk -t
+aarch64-linux-android build --example mine_benchmark --release`で
+クロスビルドし、`adb push`(PowerShell経由)で実機へ配置・実行。
+**3バッチ(合計3,145,728ハッシュ)すべて成功、`device lost`は再発しなかった**
+——修正前は2バッチ目で確実に失敗していたのに対し、明確な改善を実機で確認。
+**正直な開示**: スループットは約0.10 MH/s(修正前の1バッチ目実測
+0.48 MH/sより低下)——64回に分割したことでディスパッチ間オーバーヘッド
+(コマンドバッファ記録・`vkQueueSubmit`・`vkDeviceWaitIdle`の往復)が
+64倍になったのが原因。安定性のためのトレードオフとして正直に記録する
+(次回、サブバッチサイズのチューニング〈安定性を保ちつつ大きくできるか〉
+は再検討の余地がある)。
+
+## B. open-cuda複数GPU対応の修正(2026-08-06)
+
+`opencuda_vulkan::VulkanDevice::new(id)`の`id`引数が物理デバイス選択に
+使われていなかった実バグを修正(詳細は下記実装記録)。このマシンには
+GPUが1枚(NVIDIA GT730)のみのため、**2枚目以降のGPUを実際に選択できる
+ことの実機検証は不可能**——`id`が範囲外の場合に正しくエラーになること、
+`id=0`(唯一の実機構成)で従来通り動作することのみ実機検証済み。
+
 ## 複数GPU・NPU・大規模スケール("1枚〜数千枚"・NPU複数・LLM同時稼働)について(正直な開示、未実装)
 
 ユーザーから「1枚から十数枚から数千枚の想定のグラフィックボードとあれば

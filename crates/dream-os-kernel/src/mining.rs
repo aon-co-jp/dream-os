@@ -70,9 +70,61 @@ pub struct MiningBatchResult {
     pub digests: Vec<[u8; 32]>,
 }
 
+/// モバイルGPUドライバ向けの既定サブバッチサイズ(2026-08-06追加、
+/// Android実機〈Adreno 619〉で`DEFAULT_BATCH_SIZE`〈1,048,576〉を1回の
+/// ディスパッチにまとめたところ2バッチ目で`vkQueueSubmit failed: The
+/// logical device has been lost`〈モバイルGPUドライバのTDR、Timeout
+/// Detection and Recovery相当〉が実際に発生したことを受けての対策。
+/// デスクトップGPU〈NVIDIA GT730〉では同じ`DEFAULT_BATCH_SIZE`で問題は
+/// 起きなかったため、モバイル環境限定でこの小さいサブバッチサイズへ
+/// 分割する設計とした——1回のディスパッチあたりの実行時間を短く保つ
+/// ことで、ドライバ側のタイムアウト閾値に達する前に`vkQueueSubmit`+
+/// `vkDeviceWaitIdle`のサイクルを完了させる狙い。
+pub const MOBILE_SUB_BATCH_SIZE: u32 = 256 * 64; // 16,384 hashes/dispatch
+
 impl MiningWorker {
     pub fn new(device: Arc<dyn GpuDevice>, spirv: Vec<u8>) -> Self {
         Self { device, spirv }
+    }
+
+    /// `mine_batch`を`sub_batch_size`単位に分割して繰り返し呼び出し、
+    /// 結果を結合する(2026-08-06追加、Android実機のTDR対策)。
+    ///
+    /// デスクトップGPUでは`mine_batch`を1回の大きなディスパッチで呼ぶ方が
+    /// オーバーヘッド(コマンドバッファ記録・`vkQueueSubmit`・
+    /// `vkDeviceWaitIdle`の往復)が少なく有利だが、モバイルGPUドライバは
+    /// 単一ディスパッチの実行時間に対して厳しいタイムアウトを持つため、
+    /// `sub_batch_size`を小さく保つことで安定動作させる(実機で確認済み、
+    /// `MOBILE_SUB_BATCH_SIZE`のdocコメント参照)。1回でもサブバッチが
+    /// 失敗した場合はそこで打ち切り、失敗までに集めた結果は返さず
+    /// エラーとして呼び出し側へ伝える(部分的な結果を「成功」と偽らない)。
+    pub fn mine_batch_split(
+        &self,
+        base_message: [u32; 8],
+        nonce_base: u32,
+        total_count: u32,
+        sub_batch_size: u32,
+    ) -> Result<MiningBatchResult> {
+        if sub_batch_size == 0 {
+            anyhow::bail!("sub_batch_size must be > 0");
+        }
+        let mut hashes = 0u64;
+        let mut elapsed = Duration::ZERO;
+        let mut digests = Vec::with_capacity(total_count as usize);
+
+        let mut remaining = total_count;
+        let mut offset = 0u32;
+        while remaining > 0 {
+            let this_batch = remaining.min(sub_batch_size);
+            let result = self.mine_batch(base_message, nonce_base.wrapping_add(offset), this_batch)?;
+            hashes += result.hashes;
+            elapsed += result.elapsed;
+            digests.extend(result.digests);
+            offset = offset.wrapping_add(this_batch);
+            remaining -= this_batch;
+        }
+
+        Ok(MiningBatchResult { hashes, elapsed, digests })
     }
 
     /// `nonce_base..nonce_base+count`の範囲のnonceについて、
