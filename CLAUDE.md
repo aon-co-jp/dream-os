@@ -729,6 +729,41 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-07(続き3) open-directx/open-cuda/aruaru-llmとの関連性・連携性
+  調査(ユーザー指示「4リポジトリの関連性・連携性・実用性・完成度を向上」、
+  本リポジトリへのコード変更は無し、正直な開示)**: `open-cuda`側CLAUDE.md
+  冒頭の保留タスク(東芝SBM〈`sbm_ising`〉/DeepSeek技術を8リポジトリへ
+  組み込む構想)を踏まえ、`crates/dream-os-kernel/src/sbm.rs`
+  (64スピンPoC)・`mining.rs`(open-cuda連携のsha256d_mineカーネル
+  ディスパッチ)・`directx_bridge.rs`(open-directx連携)を再確認したが、
+  この構想の前提である「`open-directx`/`open-cuda`側で`sbm_ising`を
+  適用できる具体的な組合せ最適化問題を先に特定する」という調査自体は
+  今回未着手(`open-directx`側の境界チェック付きチェーン生成の内部構造
+  ・`open-cuda`側のGEMM/Attentionディスパッチスケジューリングのいずれも、
+  安易に「SBMで最適化できそう」と決め打ちすると憶測に基づく実装になる
+  リスクがあると判断したため、慎重に見送った)。`cargo build --workspace`
+  で既存の健全性(警告0件)のみ再確認した。`open-cuda`側では今回
+  `open-cuda-llm`のAttention経路への`flash_attention_with_spirv`配線
+  (実機検証済み、詳細は`open-cuda/CLAUDE.md` 2026-08-07(続き5)HANDOFF
+  参照)を実施しており、これは`sha256d_mine`カーネル(本リポジトリが
+  依存する既存の連携経路)とは独立した別のディスパッチ経路のため、
+  本リポジトリの`mining.rs`側の呼び出しには影響しない(念のため
+  `cargo test -p dream-os-kernel`で既存テストの回帰も確認、変更なし)。
+  - 次にすべきこと: (1) `open-directx`/`open-cuda`側それぞれで
+    「`sbm_ising`が解ける組合せ最適化問題」の具体候補を1つ以上特定して
+    から着手する(本リポジトリ単独では相手側の内部構造への理解が
+    不足しており特定できない、両リポジトリ側からの提案を待つ形が
+    現実的)、(2) Android実機連携(直前HANDOFF群)の延長として、
+    `sbm_ising`は既に`opencuda_core::GpuDevice`経由のGPUディスパッチを
+    持つ(`crates/dream-os-kernel/tests/sbm_real_vulkan.rs::
+    gpu_sbm_ising_matches_cpu_reference_on_real_hardware`で実機検証
+    済みと確認、本エントリを書く前に`cargo test -p dream-os-kernel`を
+    実行して確認——当初「CPU実装のみ」と誤って書きかけたが、テスト
+    実行結果で訂正した)ため、Android実機(Adreno 619)上でこの既存の
+    GPU経路を使う設計自体は既に成立しているはずだが、Android実機上での
+    `sbm_ising`のGPU経路の実行確認(`mining.rs`のsha256d_mineとは別に)
+    は未確認のまま(次回確認対象)。
+
 - **2026-08-07(続き2) DreamOS用Android連携アプリ(実APK、ProcessBuilder
   方式)を新規実装・実機画面で動作確認**: 直前のHANDOFFエントリ
   (`dream_os_status`のAndroid実機コマンドライン実行検証)を踏まえ、
