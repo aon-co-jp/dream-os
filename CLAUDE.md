@@ -729,6 +729,37 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-07 sbm_ising/directx_bridgeのAndroid実機検証**: ユーザー指示
+  「dream-os・open-directx・open-cuda・aruaru-llmの連携性強化・実用性
+  向上・利便性向上・完成度向上」への対応として、上記「次にすべきこと」
+  最優先項目だった「Android実機でのsbm_ising/directx_bridgeの実機検証」
+  (これまでmining.rsのみAndroid実機検証済みで、sbm.rs/directx_bridge.rs
+  はWindows実機のみだった)を実施。
+  `crates/dream-os-kernel/examples/sbm_benchmark.rs`・
+  `examples/directx_bridge_benchmark.rs`(新規)を、既存の
+  `mine_benchmark.rs`と同じパターン(`cargo test`がAndroidクロス
+  ビルド環境では動かせないため、`adb push`して直接実行できる単体
+  バイナリとして提供)で追加。テスト本体(`tests/sbm_real_vulkan.rs`・
+  `tests/directx_bridge_real_vulkan.rs`)と同じ検証ロジックを移植した。
+  **実機検証結果**: Windows実機(NVIDIA GT730)で両方とも成功を確認した
+  上で、`cargo ndk -t aarch64-linux-android build --release`でクロス
+  ビルドし、PowerShell経由の`adb push`(Git BashからのUnixパス自動変換
+  問題を過去に踏んだため、既存の申し送り通りPowerShellから`adb`を
+  呼んだ)でAndroid実機(Moto G53Y 5G、Adreno 619)へ配置・実行。
+  - `sbm_benchmark`: GPU/CPU参照実装が64/64スピン完全一致
+    (Windows実機と同じエネルギー値`-38.0885`)。
+  - `directx_bridge_benchmark`: open-directx製DXBC→SPIR-V翻訳が
+    Android実機のVulkan実行基盤上でも256要素すべてCPU参照実装と一致。
+  mining.rsで発見した`device lost`のような不安定挙動は今回発生せず
+  (問題規模が小さいディスパッチ1回のみのため)。`cargo build
+  --workspace --release`/`cargo test --workspace --release`で全クレート
+  regression無し(GT730実機込み)。
+  - 次にすべきこと: (1) World Laboratoryコーディネータ本体
+    (RPoem/open-web-server上への実HTTP API)の実装、(2) aruaru-llmとの
+    連携(World Laboratoryのワークロード種別としてLLM推論タスクを追加)、
+    (3) 複数GPU対応は引き続きこのマシンに実機が無いため未着手のまま、
+    (4) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
 - **2026-08-06(続き2) 実機ベースでスコープを絞り込み**: 上記
   「スコープの絞り込み」節を参照。macOS/iPhone・PS5/6・Switch2は
   「将来ライセンス取得を前提とした保留」へ変更し、Windows(GT730実機)・
