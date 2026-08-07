@@ -32,7 +32,12 @@ dream-os/
         ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
         ├── src/{lib,power_profile,mining,sbm,directx_bridge}.rs
         ├── shaders/{vector_add,sha256d_mine,sbm_ising}.{comp,spv}
-        ├── examples/{dispatch_throttled,mine_benchmark}.rs
+        ├── examples/{dispatch_throttled,mine_benchmark,sbm_benchmark,
+        │            directx_bridge_benchmark}.rs
+        │            # sbm_benchmark/directx_bridge_benchmark(2026-08-06新設):
+        │            # cargo testが使えないAndroidクロスビルド環境向けに、
+        │            # adb pushして直接実行できる単体バイナリとして実装
+        │            # (Windows GT730・Android Adreno 619両方で実機検証済み)
         └── tests/{mining_real_vulkan,sbm_real_vulkan,directx_bridge_real_vulkan}.rs
         # directx_bridge.rsは../../../open-directx/crates/
         # directx-shader-translate へのpath依存を追加で持つ
