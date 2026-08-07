@@ -1,5 +1,25 @@
 # DreamOS (dream-os)
 
+> 📌 **最近の更新(2026-08-07)**: Android実機(Adreno 619)で
+> open-cuda(Vulkanデバイスオープン)・open-directx(DXBC→SPIR-V翻訳)
+> 連携のPoCを実証する新規Androidアプリ(`android/`)を追加、Windows実機
+> (GT730)・Android実機の両方で動作確認。SBM/DeepSeek組み込み構想
+> (2026-08-06保留タスク)については、各リポジトリでの具体的な最適化
+> 対象が依然未特定のため、憶測に基づく実装は避けて見送った(調査結果は
+> [CLAUDE.md](CLAUDE.md)に正直に記録)。この調査の過程で
+> `sbm_ising`が既に`opencuda_core::GpuDevice`経由のGPU実行パスを持つ
+> ことを`cargo test`で再確認した(CPU限定という以前の誤記を訂正)。
+>
+> *English*: Added a new Android app (`android/`) demonstrating an
+> open-cuda (Vulkan device open) + open-directx (DXBC→SPIR-V
+> translation) integration PoC, verified on real hardware (Windows
+> GT730 + Android Adreno 619). The Toshiba SBM/DeepSeek integration plan
+> remains pending — no concrete per-repo optimization target has been
+> identified yet, so no speculative implementation was made (see
+> [CLAUDE.md](CLAUDE.md) for the honest write-up). Also corrected an
+> earlier documentation error: `sbm_ising` already has a GPU dispatch
+> path via `opencuda_core::GpuDevice`, confirmed via `cargo test`.
+
 **構想段階のプロジェクトですが、2026-08-06より実機検証済みのPoC
 (概念実証)コードが複数存在します。** この`README.md`・
 [`CLAUDE.md`](CLAUDE.md)・[`PORTING.md`](PORTING.md)・

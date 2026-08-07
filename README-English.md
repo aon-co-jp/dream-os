@@ -1,5 +1,16 @@
 # DreamOS (dream-os)
 
+> 📌 **Recent update (2026-08-07)**: added a new Android app (`android/`)
+> demonstrating an open-cuda (Vulkan device open) + open-directx
+> (DXBC→SPIR-V translation) integration PoC, verified on real hardware
+> (Windows GT730 + Android Adreno 619). The Toshiba SBM/DeepSeek
+> integration plan remains pending — no concrete per-repo optimization
+> target has been identified yet, so no speculative implementation was
+> made (see [CLAUDE.md](CLAUDE.md) for the honest write-up). Also
+> corrected an earlier documentation error: `sbm_ising` already has a
+> GPU dispatch path via `opencuda_core::GpuDevice`, confirmed via
+> `cargo test`.
+
 **This project is at the concept stage, but since 2026-08-06 it contains
 several real-hardware-verified proof-of-concept code.** This
 `README-English.md` — along with [`README.md`](README.md) (Japanese, the
