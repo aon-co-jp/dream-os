@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_launcher_dreamos"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.DreamOS">
+
+        <!--
+          DreamOS Android連携PoC(2026-08-07)。open-web-server/androidと同じ
+          「クロスコンパイル済みネイティブ実行ファイルをProcessBuilderで起動」
+          方式(JNIではなくサブプロセス方式)。本体は`dream-os-kernel`の
+          `dream_os_status`example(open-cuda/opencuda-vulkan経由のVulkan
+          Compute + open-directxのDXBC->SPIR-V翻訳ブリッジを実行し、結果を
+          標準出力へ表示する自己完結バイナリ)。
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+    </application>
+
+</manifest>

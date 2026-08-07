@@ -1,2 +1,11 @@
 /target
 crates/*/shaders/*.spv
+
+# Android(2026-08-07新規): gradleキャッシュ・ビルド成果物・SDKパスを含む
+# local.propertiesはコミットしない(open-web-server/androidと同じ方針)。
+android/.gradle/
+android/.kotlin/
+android/app/build/
+android/local.properties
+android/*.iml
+android/.idea/

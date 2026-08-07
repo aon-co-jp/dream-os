@@ -729,6 +729,94 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-07(続き2) DreamOS用Android連携アプリ(実APK、ProcessBuilder
+  方式)を新規実装・実機画面で動作確認**: 直前のHANDOFFエントリ
+  (`dream_os_status`のAndroid実機コマンドライン実行検証)を踏まえ、
+  今回はその一歩先——`open-web-server`/`open-easy-web`の
+  Android実装(JNIではなく`ProcessBuilder`でネイティブ実行ファイルを
+  起動するサブプロセス方式)を参考にした**実際のAndroidアプリ
+  (APK)**を新規実装し、実機のアプリ画面上での表示まで確認した。
+  - 新規`F:\runo\dream-os\android`(Gradleプロジェクト、package
+    `tokyo.runo.dreamos`)。`gradlew`/`gradle-wrapper.jar`等は
+    `open-web-server/android`から複製(同じGradle 8.11.1系列)。
+  - `cargo ndk -t aarch64-linux-android build -p dream-os-kernel
+    --example dream_os_status --release`でクロスビルドした実行
+    ファイルを`android/app/src/main/jniLibs/arm64-v8a/
+    libdreamosstatus.so`として同梱(open-web-server方式と同じ
+    `useLegacyPackaging=true`でnativeLibraryDir配下への実展開を強制)。
+  - `MainActivity.kt`(新規)——ボタン押下で`ProcessBuilder`により
+    このバイナリを起動し、標準出力をそのままTextViewへ表示する
+    最小実装。DreamOS固有ロジックはActivity側に一切持たせず、
+    表示ロジックのみを担う。
+  - **実機検証(Moto G53Y 5G、Adreno 619、シリアル`ZY22J7RFND`)**:
+    (a) `gradle :app:assembleDebug`(`JAVA_HOME`はAndroid Studio同梱
+    jbrを使用)で**BUILD SUCCESSFUL**(`app-debug.apk`、約3.8MB)。
+    (b) `adb install -r`→`adb shell am start`で実機へインストール・
+    起動。(c) `adb shell input tap`でボタンを実タップし、
+    `adb shell screencap`で実機画面を実際にキャプチャ——**アプリ画面上に
+    `binary: /data/app/.../lib/arm64/libdreamosstatus.so`・
+    `exit code: 0`・`vulkan device: OpenCUDA Vulkan Device
+    (Adreno (TM) 619)`・`open-directx DXBC->SPIR-V dispatch: 256
+    elements, 0 mismatches`・`result: OK`が表示されることを
+    スクリーンショットで確認**——型チェック・ビルド成功・コマンドライン
+    実行の確認だけでなく、実際のAndroidアプリUI上での動作を実証できた
+    (直前エントリまでの到達点から一歩前進)。
+  - **正直な開示・未着手事項**: (a) サブプロセス方式のまま(JNI/UniFFI
+    等によるネイティブライブラリ直接リンクではない)——将来「DreamOS
+    共通実行基盤」としてより深く統合するなら発展の余地がある。
+    (b) `dream_os_status`example1本のみを同梱、mining/sbm等の他
+    カーネルはこのアプリからは呼べない。(c) x86_64エミュレータ向け
+    jniLibsは同梱せず実機arm64-v8aのみ対象。(d) `.gitignore`へ
+    `android/.gradle/`・`android/app/build/`・`android/local.properties`
+    等を追加し、ビルド成果物・SDKローカルパスはコミット対象から除外。
+    git add/git commitは今回実行していない(ユーザー確認後の判断待ち)。
+  - 次にすべきこと: (1) JNI/UniFFI等でのネイティブ直接リンク方式への
+    発展検討、(2) mining/sbm等の他カーネルを選択実行できるUIへの拡張、
+    (3) x86_64エミュレータ向けjniLibs追加、(4) World Laboratory
+    コーディネータ本体の実装(引き続き未着手)、(5) open-directxの
+    完成度向上が優先方針のため、本格拡張は引き続き小さく育てる。
+
+- **2026-08-07(続き) 共通実行基盤の再検証+dream_os_statusのAndroid実機
+  実行を新規確認**: ユーザー指示「open-directx/open-cudaを土台にした共通
+  実行基盤の検証、Android連携PoCの実装・実機/ビルド検証を完了させる」への
+  対応。コードの新規追加はコミット済みの直前HANDOFF時点で完了していたため、
+  今回は(1)退行が無いことの再確認と、(2)これまで未実施だった
+  `examples/dream_os_status.rs`(状態確認用の最小サンプル、OS/アーキ
+  テクチャ・Vulkanデバイス名・open-directxブリッジの動作可否を1コマンドで
+  表示する)のAndroid実機実行、の2点を実施。
+  **再検証結果**: `cargo build --workspace --release`・`cargo test
+  --workspace --release`をWindows実機(GT730)で実行し全件green(退行無し、
+  power_profile単体テスト5件・GPU実機テスト5件〈mining/sbm/directx_bridge/
+  aruaru_db_integration/secure_channel_integration〉すべて成功)。続けて
+  `cargo ndk -t aarch64-linux-android build --release`(ライブラリ)・
+  `--examples`(実行バイナリ)の両方をクロスビルドし、`dream-os-kernel`・
+  `dream-os-wire`の`.rlib`および`dream_os_status`・`sbm_benchmark`・
+  `directx_bridge_benchmark`・`mine_benchmark`の全実行バイナリが生成される
+  ことを確認。**Android実機(Moto G53Y 5G、Adreno 619、シリアル
+  `ZY22J7RFND`)へ`adb push`(PowerShell経由、既存の申し送り通り)で
+  配置し実行**:
+  - `dream_os_status`(今回初のAndroid実機実行): `vulkan device: OpenCUDA
+    Vulkan Device (Adreno (TM) 619)`・`DXBC->SPIR-V dispatch: 256
+    elements, 0 mismatches`・`result: OK`を実機で確認。
+  - `sbm_benchmark`・`mine_benchmark`・`directx_bridge_benchmark`は
+    shaders(`.spv`)を`/data/local/tmp/shaders/`へ同時pushしないと
+    相対パス解決に失敗する点(`shaders/sbm_ising.spv: No such file or
+    directory`)を今回発見・対処(shaders同梱pushで解消、コード変更は
+    不要——実行手順上の注意点としてここに記録)。対処後、sbmは
+    Windows実機と同じエネルギー値`-38.0885`でGPU/CPU完全一致、mining
+    は3バッチとも`device lost`等の異常無く約0.10 MH/sで完走、
+    directx_bridgeは256要素すべてCPU参照実装と一致。
+  - コード変更・コミットは無し(検証のみ、ユーザー指示によりコミット
+    未作成)。
+  - 次にすべきこと: (1)
+    今回判明した「Android実機実行時はshaders/ディレクトリを実行バイナリと
+    同じ相対位置へ`adb push`する必要がある」という手順を、将来デプロイ
+    自動化スクリプト(あれば)やREADME/PORTING.mdの実行手順節に明記する、
+    (2) World Laboratoryコーディネータ本体(RPoem/open-web-server上への
+    実HTTP API)の実装、(3) aruaru-llmとの連携(LLM推論タスクの
+    ワークロード種別追加)、(4) 複数GPU対応は引き続き実機が無く未着手、
+    (5) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
 - **2026-08-07 sbm_ising/directx_bridgeのAndroid実機検証**: ユーザー指示
   「dream-os・open-directx・open-cuda・aruaru-llmの連携性強化・実用性
   向上・利便性向上・完成度向上」への対応として、上記「次にすべきこと」
