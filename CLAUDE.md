@@ -1112,6 +1112,71 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-08(続き2) `dream-os-raid-bridge`にrunnableデモを追加(使いやすさ
+  改善)、`dream-os-kernel/src/lib.rs`のTODO調査(コード変更なし、正直な
+  開示)。rs-sync横断セッション(dream-os/open-directxを対象範囲とした
+  インクリメント作業)の一環**:
+  1. **調査結果**: `dream-os-kernel/src/lib.rs`を実際に読み、`grep`で
+     `TODO`/`未実装`/`allow(dead_code)`/`unimplemented!`を検索したが
+     **1件も見当たらなかった**——同日早い段階の別セッションの調査結果
+     (「唯一のTODO/allow(dead_code)ヒットファイル」という記述)は、実際に
+     このファイルを直接確認した限りでは裏付けが取れなかった。誤った
+     前提に基づいてコードを書かないよう、正直にこの食い違いを記録する
+     (このファイル自体への変更は無し)。
+  2. **`dream-os-raid-bridge`へrunnableデモを追加**: 直前の2026-08-08
+     エントリで新設された`dream-os-raid-bridge`クレートには`src/lib.rs`+
+     テスト1本(`tests/raid6_bridge_real.rs`)のみで、`dream-os-kernel`の
+     `examples/sbm_benchmark.rs`/`mine_benchmark.rs`のような「テストの
+     ソースコードを読まなくても1コマンドで動作確認できるデモ」が無い
+     という使いやすさのギャップがあったため(open-directx側の
+     2026-07-27付「See it actually draw something」エントリと同じ問題
+     意識)、新規`examples/raid6_bridge_benchmark.rs`を追加した。
+     `build_loopback_raid6`/`detect_parity_accelerator`という既存の
+     公開APIをそのまま呼ぶだけで、新しいRAID/GPUロジックは一切
+     書いていない(車輪の再発明を避ける、既存方針の継続)。
+  3. **実機検証(NVIDIA GT 730)**: `cargo run -p dream-os-raid-bridge
+     --example raid6_bridge_benchmark --release`を実際に実行し、以下を
+     確認した(誇張なし、実出力そのまま):
+     ```
+     RAID6パリティアクセラレータ: Gpu (CPUフォールバック: false)
+     roundtrip: 8 stripes x 16384 bytes each, all match: true
+     self-heal after corrupting disk #1: data matches original: true, reported healed/mismatched disks: 1
+     OK: RAID6/Z2 write/read roundtrip and single-disk self-heal both verified on this machine
+     ```
+     アクセラレータが実際に`Gpu`(CPUフォールバックではない)であること、
+     8ストライプ全ての書き込み・読み出しラウンドトリップが一致すること、
+     1台のディスクを直接壊した状態から自己修復できることを実機で
+     確認した(既存の`tests/raid6_bridge_real.rs`と同じ検証内容を、
+     独立したrunnableバイナリとして提供する形)。
+  4. **ワークスペース全体の検証**: `cargo build --workspace --release`・
+     `cargo clippy --workspace --all-targets --release -- -D warnings`
+     いずれも警告0件。`cargo test -p dream-os-raid-bridge --release --
+     --nocapture`は既存2件のテストとも回帰なくgreen。
+  5. **正直な開示・今回はやらなかったこと**: (1) Android実機
+     (Moto G53Y、Adreno 619)へのこのデモのクロスビルド・実機実行は
+     今回試みていない(`open_raid_z_core`/`zfs_accel_hlsl`が
+     `aarch64-linux-android`ターゲットでビルド可能かは未検証、
+     `dream_os_status`のAndroidクロスビルドとは別のクレート依存関係の
+     ため保証されていない)。(2) flash-attentionブリッジ・
+     `directx_bridge`側の粗探しは今回時間の都合で見送った(調査は
+     `dream-os-kernel/src/lib.rs`のみ)。(3) Androidデモアプリ
+     (`android/`)を「flash-attentionのgpu==cpu_reference結果を表示する」
+     以上に拡張する作業(RAID6ブリッジの結果を画面表示する等)も
+     今回は行っていない——直前の2026-08-08エントリで既に
+     flash-attentionの実数値比較結果がAndroid実機アプリ画面上に表示
+     されていることを確認済みのため(「health checkだけでなく実際の
+     計算結果を表示する」という目標は既に達成済みと判断し、重複した
+     拡張は行わなかった)。
+  - 次にすべきこと: (1) `raid6_bridge_benchmark`のAndroid実機
+    クロスビルド検証(`open_raid_z_core`/`zfs_accel_hlsl`の
+    `aarch64-linux-android`対応状況の確認から)、(2) 前回エントリの
+    「次にすべきこと」全体(実NVMe複数枚での検証、(a)(b)の4重伝送路・
+    4重DB書き込みの本格配線、aruaru-llmクライアント層の設計等)は
+    変更なし、(3) `open-directx`側は同日並行して境界チェック付き
+    7項チェーンのDXIL側実装(DXBC/DXIL非対称の解消)を実施済み
+    (詳細は`open-directx/CLAUDE.md`参照、本リポジトリのファイルには
+    一切触れていない独立した増分)。
+
 - **2026-08-08 open-raid-zのRAID6/Z2実装をdream-osへブリッジ(実GPU検証済み)+
   GPU電力調整・LLM推薦機能の実機調査(コード追加は前者のみ、他は正直な
   計画記録)**: ユーザー指示「open-directx・open-cuda・aruaru-llm・

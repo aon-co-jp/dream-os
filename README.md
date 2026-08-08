@@ -1,5 +1,27 @@
 # DreamOS (dream-os)
 
+> 📌 **最近の更新(2026-08-08)**: `dream-os-raid-bridge`(open-raid-zの
+> RAID6/Z2実装ブリッジ)に、テストコードを読まなくても1コマンドで動作
+> 確認できるrunnableデモ`examples/raid6_bridge_benchmark.rs`を追加
+> (`cargo run -p dream-os-raid-bridge --example raid6_bridge_benchmark
+> --release`)。NVIDIA GT730実機で、RAID6パリティ計算アクセラレータが
+> 実際に`Gpu`(CPUフォールバックではない)であること、8ストライプの
+> 書き込み・読み出しラウンドトリップ一致、1台のディスクを直接壊した
+> 状態からの自己修復(パリティ2本による復元)を実際に確認した。
+> `dream-os-kernel/src/lib.rs`にTODO/未実装/`allow(dead_code)`は
+> 見当たらず、修正すべき粗は無かった(正直な開示)。
+>
+> *English*: Added a runnable demo
+> (`examples/raid6_bridge_benchmark.rs`) to `dream-os-raid-bridge` (the
+> open-raid-z RAID6/Z2 bridge) so it can be exercised with a single
+> command without reading test source. Verified on real NVIDIA GT730
+> hardware: the detected parity accelerator is actually `Gpu` (not a CPU
+> fallback), an 8-stripe write/read roundtrip matches, and the bridge
+> self-heals after directly corrupting one disk (RAID6's two parity
+> disks recover it). Checked `dream-os-kernel/src/lib.rs` for
+> TODO/unimplemented/`allow(dead_code)` markers — found none, so no fix
+> was needed there (honest disclosure).
+
 > 📌 **最近の更新(2026-08-07)**: Android実機(Adreno 619)で
 > open-cuda(Vulkanデバイスオープン)・open-directx(DXBC→SPIR-V翻訳)
 > 連携のPoCを実証する新規Androidアプリ(`android/`)を追加、Windows実機

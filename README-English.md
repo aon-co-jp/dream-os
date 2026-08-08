@@ -1,5 +1,18 @@
 # DreamOS (dream-os)
 
+> 📌 **Recent update (2026-08-08)**: Added a runnable demo
+> (`examples/raid6_bridge_benchmark.rs`) to `dream-os-raid-bridge` (the
+> open-raid-z RAID6/Z2 bridge), so it can be exercised with a single
+> command (`cargo run -p dream-os-raid-bridge --example
+> raid6_bridge_benchmark --release`) instead of having to read test
+> source. Verified on real NVIDIA GT730 hardware: the detected parity
+> accelerator is actually `Gpu` (not a CPU fallback), an 8-stripe
+> write/read roundtrip matches, and the bridge self-heals after directly
+> corrupting one disk (RAID6's two parity disks recover it). Also
+> checked `dream-os-kernel/src/lib.rs` for TODO/unimplemented/
+> `allow(dead_code)` markers — found none, so no fix was needed there
+> (honest disclosure, not a claim of exhaustive audit).
+
 > 📌 **Recent update (2026-08-07)**: added a new Android app (`android/`)
 > demonstrating an open-cuda (Vulkan device open) + open-directx
 > (DXBC→SPIR-V translation) integration PoC, verified on real hardware
