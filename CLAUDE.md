@@ -838,6 +838,35 @@ IOWN自体を「実装」することはできないが、IOWNのような低遅
   (World Laboratory設計文書フェーズ2以降)、RS-SmartTCPをpath依存で
   再利用する。
 
+### IOWN仕様の追記更新(2026-08-08、ユーザー提供情報での再確認)
+
+上記2026-08-06調査の結論(IOWNは物理インフラのため直接実装不可、
+RS-SmartTCPが適応制御として間接的に取り込む方針)は変更しないが、
+ユーザーから提供された最新情報で数値目標・構成要素をより正確に記録
+しておく。
+
+- **正式名称**: Innovative Optical and Wireless Network
+  ([NTT Group](https://group.ntt/jp/group/iown/whats.html))。
+- **目標性能(3点)**: 電力効率**100倍**・伝送容量**125倍**・
+  遅延**1/200**
+  ([NTTデータ](https://www.nttdata.com/jp/ja/trends/data-insight/2025/0403/))。
+  ——dream-os-wireの将来設計で「IOWN級の回線が使えた場合、どこまで
+  積極的な適応制御が可能か」の目安値として記録。
+- **3つの構成要素**: ①APN(オールフォトニクス・ネットワーク、
+  端末まで光のみで伝送)・②DTC(デジタル・ツイン・コンピューティング、
+  実世界とデジタル空間を掛け合わせた予測/シミュレーション)・
+  ③CF(コグニティブ・ファウンデーション、ICTリソースの最適制御)
+  ([Open Hub](https://openhub.ntt.com/journal/16100.html))——
+  RS-SmartTCPが直接関係するのは①APNの回線特性のみで、②DTC・
+  ③CFはdream-osの現在のスコープ外(将来World Laboratory構想〈分散
+  ボランティアコンピューティング〉と概念的に近い部分はあるが、今回は
+  関連性の指摘のみに留める)。
+- **実用化状況**: 2024年よりビジネス向け「APN専用線プラン」等の
+  商用サービス提供開始済み。2030年の本格普及を目標にIOWN Global
+  Forumで世界標準化の議論が進行中——**dream-osが実際にIOWN級回線の
+  恩恵を受けられる一般消費者向け普及時期はまだ先**という位置づけは
+  2026-08-06時点の結論と変わらない。
+
 ## World Laboratory構想: 通信・永続化層(第4層)を3層から4層へ拡張・実装(2026-08-06)
 
 ユーザー指示「open-web-server・RPoem・open-raid-z・aruaru-dbのACID
