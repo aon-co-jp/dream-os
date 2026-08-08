@@ -15,7 +15,7 @@
 //!
 //! `cargo run --example dream_os_status --release`
 
-use dream_os_kernel::{dispatch_dxbc_vector_add, open_device};
+use dream_os_kernel::{dispatch_dxbc_vector_add, dispatch_flash_attention, open_device};
 
 const VECTOR_ADD_DXBC: &[u8] =
     include_bytes!("../../../../open-directx/crates/directx-shader-translate/shaders/vector_add.dxbc");
@@ -53,5 +53,29 @@ fn main() {
             println!("open-directx DXBC->SPIR-V dispatch: FAILED ({e})");
         }
     }
+
+    // open-cuda連携の第2弾: open-cuda-llmが既に実配線済みのfused
+    // flash-attention SPIR-Vカーネルを、dream-osの共通Vulkan実行基盤から
+    // そのまま再利用できることを実証する(deterministicな8x16のQ/K/V、
+    // GPU結果とCPU参照実装〈opencuda-blas::flash_attention〉が一致する
+    // ことまで実際に計算・比較する)。
+    const SEQ_LEN: usize = 8;
+    const HEAD_DIM: usize = 16;
+    let mk = |offset: f32| -> Vec<f32> {
+        (0..SEQ_LEN * HEAD_DIM).map(|i| ((i as f32 + offset) * 0.01).sin()).collect()
+    };
+    let q = mk(0.0);
+    let k = mk(1.0);
+    let v = mk(2.0);
+    match dispatch_flash_attention(device.as_ref(), &q, &k, &v, SEQ_LEN, HEAD_DIM, 4) {
+        Ok((_out, matches)) => {
+            println!("open-cuda flash-attention SPIR-V dispatch: seq_len={SEQ_LEN}, head_dim={HEAD_DIM}, gpu==cpu_reference: {matches}");
+            println!("result: {}", if matches { "OK" } else { "MISMATCH" });
+        }
+        Err(e) => {
+            println!("open-cuda flash-attention SPIR-V dispatch: FAILED ({e})");
+        }
+    }
+
     println!("=== end ===");
 }

@@ -729,6 +729,72 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-08 open-cuda製fused flash-attention SPIR-Vカーネルをdream-os
+  の共通Vulkan実行基盤経由で実行、Windows実機・Android実機の両方で実証
+  (rs-sync横断セッション、直前2026-08-07(続き3)HANDOFFの「次にすべきこと」
+  への対応、`directx_bridge.rs`に続く2つ目の「共通実行基盤」実装例)**:
+  1. **新規`crates/dream-os-kernel/src/flash_attention_bridge.rs`**:
+     `open-cuda-llm`のDecoderLayerへ既に配線・実機検証済みの
+     `opencuda-blas::flash_attention_with_spirv`(QKᵀ・オンラインsoftmax・
+     P·Vを1回のディスパッチで完結させるfusedカーネル)を、
+     `dream-os-kernel`の`open_device()`(Vulkan実行基盤)経由でそのまま
+     呼び出す`dispatch_flash_attention()`を実装。シェーダ本体
+     (`flash_attention.spv`)は`open-cuda`側の既存アセットを
+     `include_bytes!`でそのまま取り込み(独自コピーは作らない)。
+     `Cargo.toml`に`opencuda-blas`をpath依存として追加。
+  2. **`examples/dream_os_status.rs`を拡張**: 既存のopen-directx DXBC→
+     SPIR-Vディスパッチに続けて、8×16のQ/K/Vでflash-attentionを実行し、
+     GPU結果とCPU参照実装(`opencuda-blas::flash_attention`)が数値一致
+     するかまで実際に計算・比較して表示するようにした。
+  3. **実機検証(型チェックのみで完了と報告しない方針を徹底)**:
+     - Windows実機(NVIDIA GT 730): `cargo test --workspace --release`
+       (新規`tests/flash_attention_bridge_real_vulkan.rs`含め全件green、
+       既存の`directx_bridge`/`mining`/`sbm`/`aruaru_db_integration`/
+       `secure_channel_integration`もregression無し)。
+       `cargo run --example dream_os_status --release`を実行し、
+       `open-cuda flash-attention SPIR-V dispatch: seq_len=8, head_dim=16,
+       gpu==cpu_reference: true`・`result: OK`を実機ログで確認。
+     - `cargo clippy --workspace --all-targets --release -- -D warnings`
+       で、今回のチェーン拡張とは無関係のpre-existing警告2件
+       (`directx_bridge.rs`の`manual_slice_size_calculation`、
+       `sbm.rs`の`run_sbm_ising`の`too_many_arguments`、clippyのlint
+       ルール追加によるもの)を検出・修正し、workspace全体で警告0件を
+       達成。
+     - **Android実機(Moto G53Y 5G、Adreno 619、シリアル`ZY22J7RFND`、
+       `adb`接続確認済み)**: `cargo ndk -t aarch64-linux-android build
+       --release --example dream_os_status`でクロスビルドし、
+       `adb push`(PowerShell経由)で実機へ配置・実行。
+       `vulkan device: OpenCUDA Vulkan Device (Adreno (TM) 619)`・
+       `open-cuda flash-attention SPIR-V dispatch: seq_len=8, head_dim=16,
+       gpu==cpu_reference: true`・`result: OK`を実機で確認——
+       fused flash-attentionカーネルがモバイルGPU実機上でも正しく動作し
+       CPU参照実装と一致することを初めて実証した。
+     - **Android実機アプリ(APK)経由でも確認**: 上記クロスビルド済み
+       バイナリを`android/app/src/main/jniLibs/arm64-v8a/
+       libdreamosstatus.so`へ差し替え、`gradle :app:assembleDebug`
+       (`BUILD SUCCESSFUL`)→`adb install -r`→実機のボタンを実際に
+       タップ→`adb shell screencap`で実機画面をキャプチャし、
+       アプリUI上に上記結果が表示されることをスクリーンショットで確認
+       (シェーダーは`include_bytes!`でバイナリへ埋め込み済みのため、
+       DXBC/flash-attention双方とも実行時の外部ファイル配置は不要——
+       単一の実行ファイルをAPKへ同梱するだけで完結する設計)。
+  4. **正直な開示・スコープの限界**: (a) 8×16という極めて小さいQ/K/V
+     でのPoCであり、GPT-2 124M実寸(`head_dim=64`、`seq_len`は生成長に
+     依存)での速度・大規模データでの数値安定性は未検証。(b) これは
+     「dream-osの共通実行基盤からopen-cudaの既存fusedカーネルをそのまま
+     再利用できる」ことの実証に留まり、dream-os自体が新しい推論
+     ワークロード(例: World Laboratoryのワーカー層でのLLM推論タスク)を
+     持つところまでは実装していない。(c) `directx_bridge`同様、
+     Windows/Androidのみの検証で、AMD/Intel/Linux/macOS実機は未検証
+     (実機が無いため)。
+  - 次にすべきこと: (1) GPT-2実寸の`head_dim`/`seq_len`でのベンチマーク
+    (現状は8×16のPoC規模のみ)、(2) World Laboratoryコーディネータ本体
+    (RPoem/open-web-server上への実HTTP API)の実装は引き続き未着手、
+    (3) `sbm_ising`が解ける組合せ最適化問題の具体候補の特定
+    (open-directx/open-cuda側からの提案待ち、前回から変化なし)、
+    (4) open-directxの完成度向上が優先方針のため、本格拡張は引き続き
+    小さく育てる。
+
 - **2026-08-07(続き3) open-directx/open-cuda/aruaru-llmとの関連性・連携性
   調査(ユーザー指示「4リポジトリの関連性・連携性・実用性・完成度を向上」、
   本リポジトリへのコード変更は無し、正直な開示)**: `open-cuda`側CLAUDE.md

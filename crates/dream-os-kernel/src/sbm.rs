@@ -69,6 +69,7 @@ pub struct SbmResult {
 ///
 /// `init_x`はホスト側で決定的に生成した初期値(CPU参照実装と全く同じ
 /// 初期値を使うことで、GPU/CPU双方の軌道を数値的に比較検証できる設計)。
+#[allow(clippy::too_many_arguments)]
 pub fn run_sbm_ising(
     device: &Arc<dyn GpuDevice>,
     spirv: &[u8],

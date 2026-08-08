@@ -33,7 +33,7 @@ pub fn dispatch_dxbc_vector_add(device: &Arc<dyn GpuDevice>, dxbc_bytes: &[u8], 
 
     let kernel = translate_vector_add_shader(dxbc_bytes).context("DXBC->SPIR-V translation failed (open-directx)")?;
 
-    let bytes = n * std::mem::size_of::<f32>();
+    let bytes = std::mem::size_of_val(a);
     let da = alloc_buffer(device, bytes)?;
     let db = alloc_buffer(device, bytes)?;
     let dc = alloc_buffer(device, bytes)?;

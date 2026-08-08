@@ -11,6 +11,7 @@ description = "DreamOS PoC: Windows/Android共通実行基盤の最小プロト�
 opencuda-core = { path = "../../../open-cuda/crates/opencuda-core" }
 opencuda-vulkan = { path = "../../../open-cuda/crates/opencuda-vulkan", features = ["real-vulkan"] }
 opencuda-ir = { path = "../../../open-cuda/crates/opencuda-ir" }
+opencuda-blas = { path = "../../../open-cuda/crates/opencuda-blas" }
 directx-shader-translate = { path = "../../../open-directx/crates/directx-shader-translate" }
 anyhow = "1"
 
