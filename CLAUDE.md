@@ -273,21 +273,46 @@ DreamOSがこれらとどう統合されるか(例: open-directxのVulkan実行�
   アプリが高速・スムーズに動作すること。
 - **Linux/macOSアプリ互換**も前提とする。
 - **ゲーム機互換(将来予定)**: PS6(2026-08-08時点で未発売・未発表の
-  次世代機)のゲームが4K120FPS・Dolby Vision 2 Max
-  (2026-08-08訂正: 当初「ULTRA」と記録していたが「Max」が正しい名称との
-  ユーザー訂正を受けて修正)相当で動作すること、Nintendo Switch 2の
+  次世代機)のゲームが4K120FPS相当で動作すること、Nintendo Switch 2の
   ゲームアプリの動作互換も予定。
 
-  **Dolby Vision 2 Maxの仕様(2026-08-08、ユーザー提供メモ)**:
-  ビット深度12bit(約680億色)・最大輝度10,000nits・色域BT.2020
-  ([phileweb.com](https://www.phileweb.com/sp/review/column/202604/14/2996.html)、
-  [totalnavi.net](https://totalnavi.net/hdr10-hdr10plus-dolby-vision-toha/)、
-  いずれもユーザー提供の出典であり、このセッション側での独立した
-  再検証〈Web検索での裏取り〉は未実施——次回、Web検索が使える
-  セッションで一次情報を再確認することを推奨)。DreamOS側の実装
-  目標としては、上記スペック(12bit・10,000nits・BT.2020)を映像
-  パイプラインの目標仕様として記録しておく(コード実装は現時点では
-  未着手、PS6互換自体が上記の通り将来課題のため)。
+## Dolby Vision 2 Max: PS6専用ではなく汎用ディスプレイ規格と判明(2026-08-08訂正、ユーザー指摘+Web検索での再確認)
+
+前回HANDOFFで「Dolby Vision 2 Max」をPS6互換(ライセンス取得待ちの将来
+課題)の一部として記録していたが、**ユーザーから「PS6でなくてもPCの
+規格かもしれない、今のハードウェアが未対応でも今のうちに対応を」との
+指摘があり、日英Web検索で再確認した結果、これは正しい指摘だった**。
+
+**実際の裏付け(2026-08-08、Web検索で確認)**: Dolby Vision 2は
+**Dolby社が2026年に展開を開始した汎用HDRディスプレイ規格**であり、
+PlayStationを含むいかなるゲーム機とも無関係——**Hisense(UX/UR9/UR8/U7
+シリーズ)・Philips(OLED811等の2026年OLEDテレビ)・TCL(X QD-Mini LED・
+2026年C-series)が2026年発売の一般消費者向けテレビとして搭載**する
+([Sports Video Group](https://www.sportsvideo.org/2026/08/06/dolby-vision-2-begins-rollout-on-select-2026-hisense-tvs/)、
+[Forbes](https://www.forbes.com/sites/johnarcher/2026/08/06/dolby-vision-2-arrives-on-hisense-tvs/)、
+[Display Daily](https://displaydaily.com/dolby-vision-2-arrived-at-ces-2026-with-hisense-tcl-and-philips-as-launch-partners/)、
+[FlatpanelsHD](https://www.flatpanelshd.com/news.php?subaction=showfull&id=1773748802))。
+**標準版「Dolby Vision 2」+上位版「Dolby Vision 2 Max」の2階層構成**
+(Max版はAuthentic Motion〈判断的フレーム補間ではないモーション処理〉・
+Light Sense 2〈周辺光に応じた表示調整〉を追加)。
+
+**ビット深度12bit・最大輝度10,000nits・色域BT.2020という仕様
+(ユーザー提供の出典、phileweb.com/totalnavi.net)は今回のWeb検索では
+直接の再確認はできなかった**が、Dolby Vision 2自体が実在し2026年に
+実際のテレビへ展開中という大枠は確認できた——数値仕様の詳細は
+今後Dolby公式資料等でさらに裏取りする余地がある。
+
+**結論・方針転換**: Dolby Vision 2 MaxはPS6互換のライセンス待ち項目
+ではなく、**HDMI経由でPC/DreamOSからテレビ・モニターへ直接出力する
+一般的な映像パイプラインの目標仕様として、PS6互換とは独立に今から
+準備を始めるべき**——ユーザー指摘の通り、現在この開発機に対応
+ディスプレイが無くても、ソフトウェア側の色深度・輝度・色域の
+パイプライン設計(12bit・HDR輝度メタデータ・BT.2020色域変換)を
+先行して用意しておく価値がある。**正直な開示**: 現時点でこの開発
+環境にはDolby Vision 2/Max認証済みディスプレイが無く、実機での
+表示確認は不可能——ソフトウェア側の色空間変換・ビット深度処理の
+実装・単体テストまでは今のハードウェアでも可能なので、次回はその
+範囲から着手する。
 
 **正直な評価(現時点の技術的距離)**: 上記は、Windows向けゲーム/CAD
 アプリを別OS上で高速に動かす(Wine/Protonのような互換レイヤー、または
