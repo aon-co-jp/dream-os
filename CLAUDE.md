@@ -304,6 +304,104 @@ DMCA等の反回避規定に抵触しうる**——将来この領域へ実際�
 必ず公式ライセンス経路(上記NDA取得)を前提とし、非公式な回避手段には
 踏み込まない方針を維持すること。
 
+## SOUND関連の技術提案(2026-08-08、ユーザー提案+日英Web検索での裏取り)
+
+ユーザー提案「Auro-CX・MQA・DSD・STEREOをGoogle検索した上で、最新の
+サラウンド技術とIMAXシアター・4DXシアターの音響・映像技術を、OS
+レベル・CPU実装レベル・GPU実装レベル・NPU実装レベルに近い部分と
+DirectX対応機能として将来搭載する」という構想を調査した(コード
+未着手、上記「長期ビジョン」と同じく提案・調査段階の記録)。
+
+- **Auro-3D / Auro-CX**: 5.1/7.1の水平サラウンドに高さ方向(オーバー
+  ヘッド)を加えた3Dイマーシブ音響フォーマット(Auro Technologies社、
+  ベルギー)。高さ情報を標準PCMへ重畳する方式のため、**非対応の
+  デコーダでも既存の5.1/7.1として問題なく再生できる後方互換性**を
+  持つ。Auro-CXは配信・放送向けの次世代コーデックとして開発が
+  継続中([auro-3d.com](https://www.auro-3d.com/)、
+  [Wikipedia](https://en.wikipedia.org/wiki/Auro-3D))。DreamOSで
+  検討する場合、既存のDolby Atmos/DTS:X同様「複数の空間音響
+  フォーマットの1つ」として抽象化層で扱うのが妥当と考えられる。
+- **MQA(正直な開示・市場動向に注意)**: 2026-08-08時点の調査で、
+  **MQAは市場から急速に後退している**ことが判明した——主要
+  ストリーミングサービスTidalが2024年7月にMQA対応を完全に打ち切り、
+  FLACへ移行済み([Audioengine](https://audioengine.com/explore/tidal-announces-they-are-dropping-support-for-mqa-hi-res-audio/)、
+  [Digital Trends](https://www.digitaltrends.com/home-theater/what-is-mqa/))。
+  理由は独自ライセンス費用(ストリーミング事業者への従量課金+
+  対応DACチップ必須)への批判。**「未来の技術」としてMQAを新規に
+  OS実装へ組み込む優先度は低いと判断する**——将来的に音源フォーマット
+  対応を拡張する場合は、オープンなFLAC(既に業界標準、24bit/192kHz)を
+  優先し、MQAは「過去に存在した独自規格」程度の位置づけに留めるのが
+  現実的([Speaker Feed](https://speakerfeed.com/hi-res-audio-file-formats-explained/))。
+- **DSD(Direct Stream Digital)**: プロのアーカイブ・マスタリング
+  用途で使われる1bit高サンプリングレート方式、ファイルサイズが
+  非常に大きく専用ハードウェア/ソフトウェアでの再生が前提
+  ([audiointensity.com](https://audiointensity.com/blogs/dsp/high-resolution-audio))。
+  DoP(DSD over PCM)方式でのソフトウェアデコード対応であれば
+  DreamOS側での実装難度は比較的低いと考えられる(未検証、次回調査
+  候補)。
+- **SACD(Super Audio CD)/ Blu-ray Audioクオリティ実装**: SACDは
+  サンプリングレート2.8224MHz・1bit解像度のDSD(Direct Stream
+  Digital、PDM方式)で符号化され、ステレオで非圧縮5.6Mbps
+  (CD音質の4倍)([TREBLAB](https://treblab.com/blogs/news/what-is-sacd)、
+  [Wikipedia](https://en.wikipedia.org/wiki/Super_Audio_CD))。
+  対する「Pure Audio Blu-ray」は24bit/192kHz PCMまたはロスレス
+  マルチチャンネルコーデック・25GB超の大容量に対応するが、対応
+  ソフト・専用プレーヤーの普及はSACDより少ないニッチ規格
+  ([Magnetar Audio](https://www.magnetarusa.com/blogs/latest_blogs/the-ultimate-guide-to-music-on-disc-sacd-dvd-audio-cd-blu-ray-audio-dsd))。
+  **DreamOS側の実装方針として妥当と考えられる範囲**: 物理ディスクの
+  読み取り自体(SACD独自の暗号化・著作権保護機構)はハードウェア
+  ライセンスが絡むため対象外とし、**「SACD/Blu-ray Audio相当の
+  ビットレート・解像度(DSD64/128、24bit/192kHz PCM)をソフトウェア
+  再生パイプラインとして扱えること」**を目標に据えるのが現実的
+  (上記DSD項目の「DoP方式でのソフトウェアデコード」と同じ扱い)。
+- **ステレオ(STEREO)**: 上記いずれの空間音響フォーマットも、
+  非対応環境への**ステレオ/5.1へのダウンミックス**を前提とした設計が
+  業界標準——DreamOS側の空間音響抽象化層も、必ずステレオへの
+  フォールバック経路を持つ設計とすること。
+- **IMAX 12チャンネル音響**: 12個の独立チャンネル+サブベース、
+  低域再生は23Hzまで(体感振動としては12Hzまで)対応する広帯域
+  設計([Display Daily](https://displaydaily.com/29imax-reveals-new-12-track-audio-solution/)、
+  [hifi.fan](https://hifi.fan/imax-12-channel-audio))。
+- **4DXモーション技術**: 7.1/9.1サラウンドに、モーターシートの
+  傾き・振動・風・水・霧等の環境演出を映像に同期させる方式
+  ([Syntec Optics](https://server.syntecoptics.com/old/4dx-vs-imax-which-immersive-cinema-technology-delivers-the-ultimate-sensory-experience))——これはOS/GPU実装というより外部アクチュエータ制御
+  API(SDK)の領域であり、DreamOS本体というよりは周辺機器連携
+  (今回のスコープ外)として切り分けるのが妥当。
+- **GPU実装レベル(実在する裏付け)**: [GPU Audio](https://www.gpu.audio/)
+  社が2025年に低遅延GPUオーディオDSP SDK(Processor
+  API・DSP API・DSPコンポーネントライブラリ)を実際にリリース済み
+  ([sonicstate.com](https://sonicstate.com/news/2025/03/18/gpu-audio-sdk-released-/))——
+  「GPU実装レベルの音響処理」自体は既に実在する業界動向であり、
+  荒唐無稽な提案ではないことを確認できた。DreamOS側で採用する場合、
+  `open-cuda`(Vulkan計算基盤)の再利用が技術的に筋が良いと考えられる
+  (今回は調査のみ、実装は次回以降)。
+- **OS/DirectXレベル**: Windowsの実在するAPIは`Spatial Sound`
+  (Windows Sonic for Headphones、Dolby Atmos for Home Theater、
+  DTS:Xのいずれかをバックエンドとして選択可能)であり、Win32/UWP/
+  Xbox/HoloLens 2向けに提供されている
+  ([Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/coreaudio/spatial-sound))。
+  **正直な訂正**: フック先はDirect3D(グラフィックスAPI)ではなく
+  Windows Core Audio APIs(`XAudio2`/`Spatial Sound`)であり、
+  「DirectX対応」という表現は正確には「Windows Core Audio API対応」
+  と言い換えるのが技術的に正確——DreamOSの提案文書でもこの区別を
+  明記すること。
+- **NPU実装レベル(未検証・裏付け不十分)**: AIノイズ抑制・
+  アップミックス等にNPUを使う製品(Windows Studio Effects等)は
+  実在するが、今回の検索では「NPUによる空間音響処理」に特化した
+  確立された標準・SDKは見つからなかった——**現時点では未検証の
+  将来領域として正直に保留**し、確立されたSDKが登場した段階で
+  再調査すること。
+
+**結論(現時点での提案の位置づけ)**: 上記は調査に基づく妥当性のある
+方向性だが、DreamOS自体がまだPoC段階(§「長期ビジョンの詳細化」参照)
+であるため、**今回のパスではコード実装は行わない**——上記「長期
+ビジョン」と同じ「野心・提案段階」の文書化に留める。
+- 次にすべきこと: (1) `open-cuda`のVulkan基盤上でGPU Audioの
+  ProcessorAPI相当の最小PoC(例: 単純なHRTF畳み込みのGPUオフロード)を
+  検討、(2) Windows Core Audio APIs(`Spatial Sound`)とDreamOSの
+  抽象化層の対応関係を設計、(3) DSD(DoP方式)のソフトウェアデコード
+  実現可能性を追加調査。
+
 ## VPS/ローカルとの対応(2026-08-06新設)
 
 - ローカル: `F:\runo\dream-os`(このclone)。
