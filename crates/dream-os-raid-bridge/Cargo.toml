@@ -1,0 +1,24 @@
+[package]
+name = "dream-os-raid-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+description = """
+open-raid-z(open_raid_z_core / zfs_accel_hlsl)をDreamOSの
+共通実行基盤へ再利用する薄いブリッジ。RAID-Z2(=RAID6相当、
+GF(2^8) Reed-SolomonのP/Qパリティ)の書き込み・自己修復・
+CPU/GPUアクセラレータ切り替えを、open-raid-z側の実装を
+そのまま(コピーではなくpath依存で)呼び出す形で提供する。
+"""
+
+[dependencies]
+# 既存パターン(directx_bridge.rs等)と同じく、他リポジトリの実装を
+# path依存で直接再利用する(コード複製・再実装は行わない)。
+open_raid_z_core = { path = "../../../open-raid-z/open_runo_zfs_source/open_raid_z_core", default-features = false }
+zfs_accel_hlsl = { path = "../../../open-raid-z/open_runo_zfs_source/zfs_accel_hlsl" }
+thiserror = "1.0"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"

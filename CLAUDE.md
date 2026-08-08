@@ -729,6 +729,127 @@ throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実�
 
 ## HANDOFF(直近の作業ログ、上が最新)
 
+- **2026-08-08 open-raid-zのRAID6/Z2実装をdream-osへブリッジ(実GPU検証済み)+
+  GPU電力調整・LLM推薦機能の実機調査(コード追加は前者のみ、他は正直な
+  計画記録)**: ユーザー指示「open-directx・open-cuda・aruaru-llm・
+  open-web-server・RPoem・open-raid-z・aruaru-dbの良い部分をdream-osへ
+  並行して取り込み、(a)4層4重通信、(b)ACID/ZFS互換、(c)CPU+NPU+GPU
+  DirectXアクセラレータ対応のRAID6 Z2実装、(d)4〜16枚NVMe想定のRAID6
+  高速化、を統合・実用性・完成度向上」+セッション中の追加指示「(e)
+  グラフィックボードの電力調整可能なマイニングOS機能」「(f)推薦LLM
+  ダウンロード機能・LLM利用機能」への対応。**大規模な構想のため一度に
+  全部作らず、実際に検証できる範囲だけ実装し、残りは正直な設計文書化に
+  留めた**(このエコシステムの既存方針通り)。
+
+  ### (c)(d) 実装: 新規`crates/dream-os-raid-bridge`(実GPU検証済み)
+
+  調査の結果、**(c)(d)は`open-raid-z`側に既にほぼ完全な形で実装済み**
+  だったと判明——ゼロから作る必要はなく、再利用するだけで済んだ:
+  `open-raid-z/open_runo_zfs_source/open_raid_z_core::vdev::RaidZVdev`
+  (RAID-Z2/Z3、GF(2^8) Reed-SolomonのP/Qパリティ、`RaidLevel::Raid6`は
+  `Z2`のエイリアス)+`zfs_accel_hlsl`(D3D12/DirectML〈Windows〉・
+  Vulkan Compute〈Linux/Android、NPU/GPU自動検出、`device::
+  detect_best_accelerator`〉)、さらに`open_raid_z_core/examples/
+  raidz2_parity_benchmark.rs`で4〜8枚のNVMeを模したループバック
+  ベンチマークまで既に存在していた。そこで新規crate
+  `dream-os-raid-bridge`(`src/lib.rs`)をpath依存(コード複製ではない、
+  `directx_bridge.rs`と同じ方針)で追加し、`detect_parity_accelerator`/
+  `build_loopback_raid6`という薄いラッパーを提供、ルート`Cargo.toml`の
+  `members`へ追加した。
+
+  **実機検証(NVIDIA GT730、Windows)**: `tests/raid6_bridge_real.rs`
+  2件——(1) 4データ+2パリティ(RAID6/Z2)構成でストライプ書き込み→
+  読み出しのラウンドトリップ一致、(2) 1台のディスクを直接壊した状態
+  からの`read_stripe_with_report`による自己修復(パリティ2本のRAID6は
+  1台までのサイレント破損から復元できる)。**`detect_best_accelerator()`
+  が実際に`AccelKind::Gpu`(CPUフォールバックではない)を返し、GT730の
+  D3D12/DirectML経由でパリティ計算が実行されたことを`--nocapture`の
+  実行結果で確認**(`RAID6パリティアクセラレータ: Gpu (CPUフォールバック:
+  false)`)——「RAID6 Z2 + GPU DirectXアクセラレータ」という(c)の要求を
+  実機で満たせることを実証。`cargo build --workspace --release`/
+  `cargo test -p dream-os-raid-bridge --release`で確認、既存クレート
+  (同時進行中の別セッションによる`flash_attention_bridge`等の未コミット
+  変更を含む)との衝突・regressionは無いことも`cargo build --workspace`
+  で確認した。
+
+  **正直な開示・未実装/未検証**: (1) 4〜16枚という要求のうち実機検証は
+  6枚構成(4データ+2パリティ)のループバックファイルのみ、実NVMe複数枚
+  はこのマシンに無く検証不可能。(2) `opencuda_vulkan`(dream-os-kernelの
+  Vulkan基盤)と`zfs_accel_hlsl`の実行基盤は別々のデバイスハンドルの
+  ままで統合していない(設計目的が異なるため安易な統合は避けた)。
+  (3) NPU経由のパリティ計算はこのマシンにNPUが無いため未検証(コード上は
+  `AccelKind::Npu`分岐が存在しCPU/GPUと同じ経路を通る設計だが実機確認は
+  次回課題)。
+
+  ### (a)(b) 統合方針の再確認(コード変更なし、既存実装の棚卸し)
+
+  調査の結果、(a)(4層4重通信・金融データ相当の耐障害性)・(b)(ACID/ZFS
+  互換)は**dream-os側に既に部分実装済み**であることを再確認した(過去の
+  HANDOFF参照): `crates/dream-os-wire`が`open-web-server-wire::
+  SecureChannel`(AEAD+リプレイ対策、path依存)を再利用しペイロード層の
+  改ざん・リプレイ耐性を実証済み(第1層の4重伝送路〈TCP/UDP/QUIC/MPTCP〉
+  は未配線)、`crates/dream-os-wire/src/aruaru_persistence.rs`が
+  `aruaru-db`(ACID互換+Git-on-SQL)への実接続・INSERT・コミットを実証
+  済み(4重DB書き込み・`open-web-server-ledger`のマルチリージョン
+  レプリケーション・独立監査ログは実DBインスタンス不足のため未配線)。
+  今回のセッションでは、この2つを更に前進させるコードは書いていない
+  (`open-raid-z`ブリッジに集中したため)——次回の課題として維持する。
+
+  ### (e) グラフィックボード電力調整(マイニングOS機能): 実機で調査、
+  ハードウェア制約により未実装(正直な開示)
+
+  既存の`crates/dream-os-kernel/src/power_profile.rs`は
+  ディスパッチ間の休止によるソフトウェア側デューティサイクル制御のみ
+  (ハードウェアの電力制限APIは使っていない)だったため、今回
+  NVML相当の実ハードウェア電力制限(`nvidia-smi -pl`等)が実機で使えるか
+  調査した。**実際に`nvidia-smi -q -d POWER`・`nvidia-smi --query-gpu=
+  power.draw,power.limit,power.min_limit,power.max_limit,power.
+  default_limit --format=csv`をこのマシン(NVIDIA GT730、Driver
+  475.14)で実行して確認した結果、Power Management/Power Draw/Power
+  Limit等が全項目`N/A`だった**——GT730(Kepler世代の下位モデル)は
+  NVML/nvidia-smiの電力管理機能自体をハードウェアレベルでサポートして
+  いないことを実機で確認した(読み取りすら不可能、調整以前の問題)。
+  この結果、(1) 実ハードウェア電力制限の読み取り・調整のいずれも
+  このマシンでは検証不可能と判明したため実装を見送った(危険な当て
+  推量でのNVML APIコード追加はしない、というユーザー指示の安全方針にも
+  合致)、(2) 既存の`power_profile.rs`のソフトウェア側デューティサイクル
+  制御が、このエコシステムで現状唯一実機検証可能な「電力調整」手段
+  であることを再確認した。
+  - 次にすべきこと: 電力管理に対応した実GPU(GT730以外)が入手できた
+    場合、`nvml-wrapper`クレート(実在するRust製NVML安全バインディング、
+    今回未追加)経由での読み取り→保守的な範囲での調整→読み戻し確認、
+    という段階を踏んだ実装を検討する。それまでは`power_profile.rs`の
+    ソフトウェア方式を正としてドキュメント化しておく。
+
+  ### (f) 推薦LLMダウンロード・利用機能: aruaru-llmに既に実装済みと判明、
+  dream-os側では未実装(正直な開示、reuse方針)
+
+  調査の結果、**この機能は`aruaru-llm`側に既にほぼそのまま実装済み**
+  だった: `aruaru-llm/src/hardware.rs`(`opencuda-vulkan`/
+  `opencuda-directx`経由のGPU検出→VRAM容量からの推奨モデルサイズ判定、
+  DirectX優先・Vulkanはクロスチェック)+`aruaru-llm/src/model_catalog.rs`
+  (Hugging Face `resolve/main/`からのGPT-2系モデルのダウンロード・
+  インストール、ライセンス注記付き、ユーザー明示リクエスト時のみ実行)。
+  **このエコシステムの「既存実装の再利用を優先し重複実装を避ける」という
+  一貫した方針に従い、今回dream-os側に同等機能を再実装するコードは
+  書いていない**——安易な複製は既存方針(車輪の再発明回避)に反すると
+  判断した。
+  - 次にすべきこと: dream-osを「推薦LLMダウンロード・利用」機能の
+    フロントエンドにしたい場合、`aruaru-llm`をサブプロセス起動
+    (`open-web-server`のAndroid実装が使う`ProcessBuilder`方式、
+    `android/app/src/main/java/.../MainActivity.kt`と同じパターン)する
+    か、HTTP API経由で呼び出すクライアント層を`dream-os-kernel`または
+    新規crateとして追加する設計を検討する(aruaru-llm本体は変更しない、
+    read-onlyな連携のみ)。今回は時間の都合上、この設計の特定と
+    HANDOFF記録までに留めた。
+
+  - 次にすべきこと(全体、優先順): (1) `dream-os-raid-bridge`の実NVMe
+    複数枚(4〜16枚)での実機検証(実ドライブ入手後)、(2) (a)(b)の
+    4重伝送路・4重DB書き込みの本格配線(引き続き未着手)、(3) aruaru-llm
+    クライアント層の設計・実装、(4) 電力管理対応GPU入手後の`nvml-wrapper`
+    連携検討、(5) open-directxの完成度向上が引き続き優先方針のため、
+    本格拡張は小さく育てる方針を継続。
+
 - **2026-08-08 open-cuda製fused flash-attention SPIR-Vカーネルをdream-os
   の共通Vulkan実行基盤経由で実行、Windows実機・Android実機の両方で実証
   (rs-sync横断セッション、直前2026-08-07(続き3)HANDOFFの「次にすべきこと」
