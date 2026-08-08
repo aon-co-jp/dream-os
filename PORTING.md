@@ -30,17 +30,38 @@ dream-os/
                            # Windows/Android共通実行基盤+電力出力調整可能な
                            # マイニングOS向けデューティサイクル制御
         ├── Cargo.toml     # ../../../open-cuda/crates/opencuda-* へのpath依存
-        ├── src/{lib,power_profile,mining,sbm,directx_bridge}.rs
+        ├── src/{lib,power_profile,mining,sbm,directx_bridge,
+        │        flash_attention_bridge}.rs
+        │        # flash_attention_bridge.rs(2026-08-08新設): open-cudaの
+        │        # 融合flash attention SPIR-Vカーネルをdream-osの共通Vulkan
+        │        # 実行基盤経由で呼び出す、Windows GT730・Android Adreno 619
+        │        # 両実機で実証済み(8×16 toyサイズPoC、GPT-2スケールの
+        │        # ベンチマークは未実施)
         ├── shaders/{vector_add,sha256d_mine,sbm_ising}.{comp,spv}
         ├── examples/{dispatch_throttled,mine_benchmark,sbm_benchmark,
-        │            directx_bridge_benchmark}.rs
+        │            directx_bridge_benchmark,dream_os_status}.rs
         │            # sbm_benchmark/directx_bridge_benchmark(2026-08-06新設):
         │            # cargo testが使えないAndroidクロスビルド環境向けに、
         │            # adb pushして直接実行できる単体バイナリとして実装
         │            # (Windows GT730・Android Adreno 619両方で実機検証済み)
-        └── tests/{mining_real_vulkan,sbm_real_vulkan,directx_bridge_real_vulkan}.rs
+        └── tests/{mining_real_vulkan,sbm_real_vulkan,directx_bridge_real_vulkan,
+        │         flash_attention_bridge_real_vulkan}.rs
         # directx_bridge.rsは../../../open-directx/crates/
         # directx-shader-translate へのpath依存を追加で持つ
+    └── dream-os-raid-bridge/  # open-raid-zのRAID6/Z2実装ブリッジ(2026-08-08新設)
+        │                # open_raid_z_core::vdev::RaidZVdev(GF(2^8)
+        │                # Reed-Solomon)+zfs_accel_hlsl(D3D12/DirectML・
+        │                # Vulkan GPU/NPUパリティ高速化)への薄いpath依存
+        ├── Cargo.toml   # ../../../open-raid-z/open_runo_zfs_source/
+        │                # open_raid_z_core へのpath依存
+        ├── src/lib.rs
+        ├── examples/raid6_bridge_benchmark.rs
+        │            # 1コマンドで動くrunnableデモ(2026-08-08新設)。
+        │            # 実GT730でGPUアクセラレータ(CPUフォールバックでない)・
+        │            # 8ストライプ往復・1台破損からの自己修復を確認済み。
+        │            # 実機複数NVMe(4〜16枚)検証・Androidクロスビルドは
+        │            # 未実施(正直な開示、次回課題)。
+        └── tests/raid6_bridge_real.rs
     └── dream-os-wire/  # World Laboratory向け通信・永続化層
         │                # (open-web-server-wireのSecureChannel再利用=
         │                # AEAD暗号化+リプレイ対策、aruaru-db永続化)
