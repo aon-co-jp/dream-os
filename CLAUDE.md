@@ -332,6 +332,26 @@ DirectX対応機能として将来搭載する」という構想を調査した(
   対応を拡張する場合は、オープンなFLAC(既に業界標準、24bit/192kHz)を
   優先し、MQAは「過去に存在した独自規格」程度の位置づけに留めるのが
   現実的([Speaker Feed](https://speakerfeed.com/hi-res-audio-file-formats-explained/))。
+
+  **MQA運営会社の経営状況(2026-08-08、ユーザーコメントへの裏取り)**:
+  ユーザーの「利用手数料が高すぎたり、経営会社が倒産したりして大変」
+  というコメントは事実に基づいている——**MQA Ltd.は2023年4月6日に
+  「administration」(英国におけるChapter 11相当の会社更生手続き)を
+  申請**、主要な資金提供者が撤退を決めたことが直接の引き金
+  ([What Hi-Fi?](https://www.whathifi.com/features/mqa-has-gone-into-administration-what-does-this-mean-for-tidal-and-supported-products)、
+  [Strata-gee.com](https://www.strata-gee.com/mqa-limited-enters-administration-in-u-k-similar-to-chapter-11-bankruptcy/))。
+  同年9月、カナダのLenbrook Industriesが資産を買収し
+  ([Strata-gee.com](https://www.strata-gee.com/mqa-limited-no-longer-exists-say-hello-to-wave-realisations-limited/))、
+  2024年初頭には買収後の器として「Lenbrook Media Group」が
+  MQA Labsを引き継いだ。**ユーザー提案「オープンソース化で生き
+  残ってもらいましょう」について**: 2026-08-08時点の調査では、
+  Lenbrook/Wave Realisations社がMQAをオープンソース化したという
+  公式発表・裏付けは見つからなかった——現状は引き続き買収先企業に
+  よる商用独自規格のまま運営されていると見られる(未確認、次回
+  セッションで公式発表があれば要更新)。DreamOS側の提案としては、
+  「MQAが将来的にオープンソース化された場合は、FLACと並ぶ選択肢
+  として再評価する」という条件付きの記述に留め、現時点で断定的に
+  「オープンソース化された」と記載しないこと。
 - **DSD(Direct Stream Digital)**: プロのアーカイブ・マスタリング
   用途で使われる1bit高サンプリングレート方式、ファイルサイズが
   非常に大きく専用ハードウェア/ソフトウェアでの再生が前提
