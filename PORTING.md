@@ -207,3 +207,8 @@ English: with the official `dxc` for Linux (downloaded with permission), the bui
 3. `open-vsc-claude` v0.1.2 is released (`F:\open-vsc-claude`, demo `https://easy-web.tokyo/open-vps-claude/`, all four test suites pass). **Open**: Marketplace / Open VSX publication (needs the owner's account and token; see `PUBLISHING.md`), running the Cosmo Router, Claude generation with a real key, real iOS/Android devices, native review of translations.
 4. Never put secrets (tokens, API keys) in repositories; keep them in txt files at the root of `F:\` and never print or commit their values.
 5. Pitfalls: Git Bash rewrites `/mnt/...` (use PowerShell); escapes in shell heredocs turn `\n` into real newlines (write helper scripts to files first); CRLF files make scripted replacement fail silently (use the Edit tool); never `git pull` in rewritten repositories.
+
+### 追記(2026-10-18 夜): 実USBへの書き込みに成功 / Real USB write succeeded
+USB DISK 3.2(58.2GB)へ`make-usb.ps1`で書き込み成功。GPT、FAT32(ラベルDREAMOS)、`EFI/BOOT/BOOTX64.EFI`(GRUB、ハッシュが元と一致)、`grub.cfg`、日本語の長い名前のファイルまで確認。直した不具合: MBRのUSBでは`Set-Disk`が非対応のため、`diskpart`の`clean`+`convert gpt`に変更。**未確認**: USBからのUEFI起動(GRUBは署名されていないので、PCのセキュアブートをオフにする必要がある)、Windowsへのチェイン。
+English: the real USB write succeeded (GPT, FAT32, `BOOTX64.EFI` hash identical, `grub.cfg`, Japanese long file name). Fixed: `Set-Disk` is unsupported for MBR USB sticks, so the script now uses `diskpart clean` + `convert gpt`. Not yet verified: UEFI boot from the stick (GRUB is unsigned, so Secure Boot must be off) and the Windows chain-load.
+

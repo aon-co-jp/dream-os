@@ -79,7 +79,14 @@ Write-Host "パーティションを作成しています..."
 Clear-Disk -Number $DiskNumber -RemoveData -RemoveOEM -Confirm:$false
 $style = (Get-Disk -Number $DiskNumber).PartitionStyle
 if ($style -eq 'RAW') { Initialize-Disk -Number $DiskNumber -PartitionStyle GPT }
-elseif ($style -ne 'GPT') { Set-Disk -Number $DiskNumber -PartitionStyle GPT }
+elseif ($style -ne 'GPT') {
+  # リムーバブルでは Set-Disk が非対応のことがあるため diskpart で変換する(対象は上で検証済みのUSBディスクのみ)
+  $dp = Join-Path $env:TEMP "dreamos-diskpart.txt"
+  "select disk $DiskNumber`r`nclean`r`nconvert gpt`r`nexit`r`n" | Set-Content -Path $dp -Encoding ASCII
+  diskpart /s $dp | Out-Host
+  Remove-Item $dp -ErrorAction SilentlyContinue
+  Update-HostStorageCache
+}
 # FAT32 の書式設定は Windows では 32GB までのため、USBが大きくても先頭 32GB のみ使う(UEFIはFAT32を読む)
 $size = [math]::Min($d.Size - 8MB, 32GB - 1MB)
 $part = New-Partition -DiskNumber $DiskNumber -Size $size -AssignDriveLetter
