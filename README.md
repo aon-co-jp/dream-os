@@ -150,6 +150,8 @@ dream-os-disk make-iso --payload DIR --out dreamos.iso --os windows,linux,dreamo
 
 **正直な現状**: 単体試験15件成功。GPTはLinuxの`sfdisk --verify`、FAT32は`fsck.vfat`(エラー無し)と`mtools`、ISOはWindowsの`Mount-DiskImage`(日本語の長いファイル名を含め読めた)で、それぞれ第三者のツールにより確認しました。**未確認**: (1)実際のUSBメモリへの書き込み(手元に無く、拒否動作のみ確認)、(2)実ディスクの`format --device`、(3)光学ドライブへの書き込み、(4)実機のUEFI起動 — DreamOS自身はまだ起動できるOSではないため、**UEFIブートローダー(GRUBなど)は利用者が`--bootloader`で渡す必要があり**、同梱していません。(5)WindowsやLinuxの本体の導入は、それぞれの公式インストーラー(ISOは利用者が用意)で行います。DreamOSがWindowsの導入を代行することはしません。
 
+> 📌 **DreamOSインストーラー環境(2026-10-18)**: USB/CDのGRUBで「DreamOS Installer」を選ぶと、ディスクの縮小(Windowsのデータ保持)・DreamOS用領域の作成ができるテキストのインストーラーが起動します。詳細は[`PORTING.md`](PORTING.md)末尾。DreamOS本体のOSはまだありません。
+
 ## エコシステム内での位置づけ
 
 このプロジェクトは`aon-co-jp`エコシステムの一部で、特に以下と関連します

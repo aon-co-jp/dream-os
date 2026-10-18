@@ -1,0 +1,140 @@
+#!/bin/sh
+# DreamOS インストーラー(テキスト)。Linuxのコンソールは日本語を描画できないため、表示は英語(ASCII)のみ。
+# 既存のNTFSを縮小して(データは保持)、DreamOS用と共有用のパーティションを作る。
+GIB=1073741824
+DREAM_GUID=D5EA3051-0A60-4D5E-9D2A-5E41AA00D0EA
+
+part_dev() {
+  case "$1" in
+    nvme*|mmcblk*|loop*) echo "/dev/${1}p$2" ;;
+    *) echo "/dev/$1$2" ;;
+  esac
+}
+
+pause() { printf '\nPress Enter to continue... '; read -r _; }
+
+disk_list() {
+  for b in /sys/block/*; do
+    n=${b##*/}
+    case "$n" in loop*|ram*|zram*|sr*|fd*) continue ;; esac
+    sz=$(cat "$b/size"); gb=$((sz * 512 / GIB))
+    model=$(cat "$b/device/model" 2>/dev/null | tr -s ' ')
+    rem=""; [ "$(cat "$b/removable" 2>/dev/null)" = 1 ] && rem="(removable)"
+    echo "  $n   ${gb} GB   $model $rem"
+  done
+}
+
+find_usb_mount() {
+  # 起動に使ったUSB(FAT32、ラベル DREAMOS)を探して /mnt/usb に載せる
+  mkdir -p /mnt/usb
+  for dev in $(blkid -t LABEL=DREAMOS -o device 2>/dev/null); do
+    if mount -t vfat "$dev" /mnt/usb 2>/dev/null; then echo /mnt/usb; return 0; fi
+  done
+  return 1
+}
+
+add_partitions() {
+  echo
+  echo "Disks:"; disk_list
+  printf '\nDisk to modify (e.g. sda, nvme0n1): '; read -r D
+  [ -b "/dev/$D" ] || { echo "No such disk: $D"; return; }
+  echo; sgdisk -p "/dev/$D"
+  printf '\nNumber of the NTFS partition to SHRINK (its data is kept): '; read -r N
+  DEV=$(part_dev "$D" "$N")
+  [ -b "$DEV" ] || { echo "No such partition: $DEV"; return; }
+  TYPE=$(blkid -o value -s TYPE "$DEV" 2>/dev/null)
+  [ "$TYPE" = ntfs ] || { echo "$DEV is '$TYPE', not NTFS. Refusing."; return; }
+
+  CUR=$(( $(cat "/sys/class/block/${DEV##*/}/size") * 512 ))
+  INFO=$(ntfsresize --info "$DEV" 2>&1)
+  MIN=$(echo "$INFO" | sed -n 's/.*[Yy]ou might resize at \([0-9][0-9]*\) bytes.*/\1/p')
+  if [ -z "$MIN" ]; then
+    echo "ntfsresize could not read the volume:"; echo "$INFO" | tail -5
+    echo "If Windows was hibernated or uses Fast Startup, boot Windows, run 'shutdown /s /f /t 0'"
+    echo "(a full shutdown) or 'chkdsk', then try again."
+    return
+  fi
+  echo; echo "Partition $DEV: $((CUR / GIB)) GB total, data needs at least $((MIN / GIB + 1)) GB."
+
+  printf 'GB to take for DreamOS in total [500]: '; read -r GB; GB=${GB:-500}
+  printf 'Of that, GB for the shared exFAT area [50]: '; read -r SH; SH=${SH:-50}
+  case "$GB$SH" in *[!0-9]*|"") echo "Numbers only."; return ;; esac
+  [ "$SH" -lt "$GB" ] || { echo "Shared must be smaller than the total."; return; }
+  NEW=$(( (CUR - GB * GIB) / 1048576 * 1048576 ))
+  if [ "$NEW" -lt $(( MIN + 5 * GIB )) ]; then
+    echo "Not enough free space inside $DEV for that. Maximum is about $(( (CUR - MIN) / GIB - 5 )) GB."; return
+  fi
+
+  INFOP=$(sgdisk -i "$N" "/dev/$D")
+  PSTART=$(echo "$INFOP" | sed -n 's/^First sector: \([0-9]*\).*/\1/p')
+  TYPEG=$(echo "$INFOP"  | sed -n 's/^Partition GUID code: \([0-9A-Fa-f-]*\).*/\1/p')
+  UNIQ=$(echo "$INFOP"   | sed -n 's/^Partition unique GUID: \([0-9A-Fa-f-]*\).*/\1/p')
+  NAME=$(echo "$INFOP"   | sed -n "s/^Partition name: '\(.*\)'.*/\1/p")
+  PEND=$(( PSTART + NEW / 512 - 1 + 2048 ))
+
+  echo
+  echo "PLAN for /dev/$D:"
+  echo "  1. Shrink NTFS on $DEV from $((CUR / GIB)) GB to $((NEW / GIB)) GB (files are kept)"
+  echo "  2. Create DreamOS partition  $((GB - SH)) GB (ext4, label DREAMOS)"
+  echo "  3. Create shared partition   $SH GB (exFAT, label DREAMSHARED)"
+  echo "  The partition table is backed up first."
+  printf '\nType  SHRINK %s %s %s  to continue (anything else cancels): ' "$D" "$N" "$GB"
+  read -r ANS
+  [ "$ANS" = "SHRINK $D $N $GB" ] || { echo "Cancelled. Nothing was changed."; return; }
+
+  sgdisk --backup="/tmp/ptable-$D.bak" "/dev/$D" >/dev/null || { echo "Backup failed. Stopping."; return; }
+  if USB=$(find_usb_mount); then
+    cp "/tmp/ptable-$D.bak" "$USB/ptable-$D.bak" && echo "Partition table backup saved to the USB stick: ptable-$D.bak"
+    sync; umount "$USB"
+  else
+    echo "(USB stick not found; backup kept only in memory: /tmp/ptable-$D.bak)"
+  fi
+
+  echo; echo "Checking the filesystem (no changes)..."
+  ntfsresize --no-action -s "$NEW" "$DEV" >/tmp/nr.log 2>&1 || { tail -8 /tmp/nr.log; echo "Check failed. Nothing was changed."; return; }
+  echo "Shrinking NTFS (this can take a long time on a big volume)..."
+  echo y | ntfsresize -s "$NEW" "$DEV" || { echo "Shrink failed. The partition table was not changed."; return; }
+
+  sgdisk -d "$N" -n "$N:$PSTART:$PEND" -t "$N:$TYPEG" -c "$N:$NAME" -u "$N:$UNIQ" "/dev/$D" >/dev/null \
+    || { echo "Could not resize the partition entry. Restore with: sgdisk --load-backup=/tmp/ptable-$D.bak /dev/$D"; return; }
+  sgdisk -n "0:0:+$((GB - SH))G" -t "0:$DREAM_GUID" -c "0:DreamOS" "/dev/$D" >/dev/null || { echo "Could not create the DreamOS partition."; return; }
+  sgdisk -n "0:0:+${SH}G" -t "0:0700" -c "0:DREAMSHARED" "/dev/$D" >/dev/null || { echo "Could not create the shared partition."; return; }
+  sleep 2
+
+  DN=$(sgdisk -p "/dev/$D" | awk '$7=="DreamOS"{print $1}' | tail -1)
+  SN=$(sgdisk -p "/dev/$D" | awk '$7=="DREAMSHARED"{print $1}' | tail -1)
+  mkfs.ext4 -q -F -L DREAMOS "$(part_dev "$D" "$DN")" || echo "mkfs.ext4 failed"
+  mkfs.exfat -L DREAMSHARED "$(part_dev "$D" "$SN")" >/dev/null || echo "mkfs.exfat failed"
+  sync
+  echo; echo "Done. New layout:"; sgdisk -p "/dev/$D"
+  echo; echo "Windows was kept. Reboot into Windows and run chkdsk on the shrunk volume once."
+}
+
+show_disks() {
+  echo; echo "Disks:"; disk_list
+  for b in /sys/block/*; do
+    n=${b##*/}; case "$n" in loop*|ram*|zram*|sr*|fd*) continue ;; esac
+    echo; echo "== /dev/$n"; sgdisk -p "/dev/$n" 2>/dev/null | tail -n +8
+  done
+  echo; blkid
+}
+
+while true; do
+  clear
+  echo "=============================================="
+  echo "  DreamOS installer (disk tools)"
+  echo "=============================================="
+  echo "  1) Show disks and partitions"
+  echo "  2) Add DreamOS partitions (shrinks an NTFS partition, keeps its data)"
+  echo "  3) Shell"
+  echo "  4) Reboot"
+  echo "  5) Power off"
+  printf '\nSelect: '; read -r C
+  case "$C" in
+    1) show_disks; pause ;;
+    2) add_partitions; pause ;;
+    3) echo "Type 'exit' to come back."; sh ;;
+    4) sync; reboot -f ;;
+    5) sync; poweroff -f ;;
+  esac
+done

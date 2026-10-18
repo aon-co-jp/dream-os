@@ -1,2 +1,5 @@
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+*.sh text eol=lf
+installer/linux/init text eol=lf
+installer/linux/dreamos-install text eol=lf

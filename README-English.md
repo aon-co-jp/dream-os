@@ -128,6 +128,8 @@ details).
 Safety: `format --device` needs an exact `--confirm "ERASE <path> <bytes>"` and refuses `PhysicalDrive0` and mounted devices. Status: 15 unit tests pass; GPT checked with `sfdisk --verify`, FAT32 with `fsck.vfat` (clean) and `mtools`, ISO by mounting it on Windows (Japanese long names read correctly). **Not verified**: writing to a real USB stick, `format --device` on a real disk, burning a disc, UEFI boot on hardware. DreamOS itself is not a bootable OS yet, so the UEFI bootloader (e.g. GRUB) must be supplied with `--bootloader`; Windows/Linux themselves are installed by their own official installers (user-supplied ISOs).
 Other-language READMEs have not been updated yet.
 
+> 📌 **DreamOS installer environment (2026-10-18)**: choosing "DreamOS Installer" in GRUB on the USB/CD boots a text installer that shrinks a disk's NTFS partition (data kept) and creates DreamOS partitions. See the end of [`PORTING.md`](PORTING.md). There is still no DreamOS system itself.
+
 ## Place within the ecosystem
 
 Part of the `aon-co-jp` ecosystem, related in particular to (exact

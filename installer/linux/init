@@ -1,0 +1,20 @@
+#!/bin/sh
+# DreamOS インストーラー環境の PID 1。必要なドライバを読み込み、テキストのインストーラーを繰り返し起動する。
+export PATH=/usr/bin:/usr/sbin:/bin:/sbin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp /run /mnt
+mount -t tmpfs tmpfs /tmp
+dmesg -n 3 2>/dev/null
+
+# ストレージ・入力・ファイルシステムのドライバ(組み込み済みのものは無視される)
+for m in nvme ahci usb_storage uas hid_generic usbhid exfat ntfs3; do
+  modprobe "$m" 2>/dev/null
+done
+# ドライブが見えるまで少し待つ
+sleep 3
+
+while true; do
+  setsid sh -c 'exec /usr/bin/dreamos-install </dev/console >/dev/console 2>&1'
+done

@@ -25,14 +25,15 @@ pub fn grub_cfg(oses: &[Os], default: Os, timeout_s: u32) -> String {
                 "  configfile /boot/grub/grub.cfg\n}\n\n"
             )),
             Os::DreamOs => s.push_str(concat!(
-                "menuentry \"DreamOS\" {\n",
-                "  insmod part_gpt\n",
-                "  search --no-floppy --file --set=root /dreamos/grub.cfg\n",
-                "  configfile /dreamos/grub.cfg\n}\n\n"
+                "menuentry \"DreamOS Installer (partition / format disks)\" {\n",
+                "  insmod part_gpt\n  insmod iso9660\n  insmod gzio\n",
+                "  search --no-floppy --file --set=root /dreamos/vmlinuz\n",
+                "  linux /dreamos/vmlinuz console=tty0 loglevel=3\n",
+                "  initrd /dreamos/initrd.img\n}\n\n"
             )),
         }
     }
-    s.push_str("menuentry \"UEFI ファームウェア設定\" {\n  fwsetup\n}\n");
+    s.push_str("menuentry \"UEFI firmware settings\" {\n  fwsetup\n}\n");
     s
 }
 
@@ -61,7 +62,7 @@ mod tests {
     fn grub_cfg_has_each_entry_and_default_index() {
         let c = grub_cfg(&[Os::Windows, Os::Linux, Os::DreamOs], Os::Linux, 5);
         assert!(c.contains("set default=1"));
-        assert!(c.contains("bootmgfw.efi") && c.contains("/boot/grub/grub.cfg") && c.contains("/dreamos/grub.cfg"));
+        assert!(c.contains("bootmgfw.efi") && c.contains("/boot/grub/grub.cfg") && c.contains("/dreamos/vmlinuz") && c.contains("/dreamos/initrd.img"));
     }
 
     #[test]
