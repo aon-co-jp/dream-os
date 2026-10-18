@@ -67,7 +67,9 @@ if ! done_ package; then
   cd "$SRC"
   tasks="$(npm run -s gulp -- --tasks-simple 2>/dev/null | tr -d '\r')"
   task=""
-  for t in vscode-linux-x64-min-ci vscode-linux-x64-ci vscode-linux-x64-min vscode-linux-x64; do
+  # NOT the *-ci variants: they assume core-ci / extensions-ci / minify already ran (fails with ENOENT out-vscode-min/...).
+  # The non-ci task runs the whole pipeline (compile-build, optimize, minify, package).
+  for t in vscode-linux-x64-min vscode-linux-x64; do
     if printf '%s\n' "$tasks" | grep -qx "$t"; then task="$t"; break; fi
   done
   [ -n "$task" ] || { echo "no linux-x64 packaging task found in this VS Code version" >&2; exit 1; }

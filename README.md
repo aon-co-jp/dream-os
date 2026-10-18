@@ -6,9 +6,9 @@
 [Українська](README-Ukrainian.md) · [עברית](README-Hebrew.md) ·
 [فارسی](README-Persian.md) · [العربية](README-Arabic.md)
 
-> 📌 **最近の更新(2026-10-18)**: dream-os 用 Visual Studio Code として、Code-OSS(VS Code 本体の OSS 版)をビルド・パッケージし `open-vsc-claude` を同梱する手順とスクリプトを [`vsc/`](vsc/README.md) に追加(WSL で `npm ci` まで実行済み、パッケージ化以降は未検証。再開は [`vsc/BUILD-REPORT.md`](vsc/BUILD-REPORT.md))。
+> 📌 **最近の更新(2026-10-18)**: dream-os 用 Visual Studio Code として、Code-OSS(VS Code 本体の OSS 版)をビルド・パッケージし `open-vsc-claude` を同梱する手順とスクリプトを [`vsc/`](vsc/README.md) に追加(WSL で `npm ci` と `gulp` の package まで成功、最終工程の Copilot 準備で失敗・原因未調査、同梱と `verify.sh` は未実行。再開は [`vsc/BUILD-REPORT.md`](vsc/BUILD-REPORT.md))。
 >
-> *Added [`vsc/`](vsc/README.md): scripts to build and package Code-OSS (the open-source core of VS Code) as "DreamOS Code" with `open-vsc-claude` bundled. Run in WSL through `npm ci`; packaging onward is unverified — resume via [`vsc/BUILD-REPORT.md`](vsc/BUILD-REPORT.md).*
+> *Added [`vsc/`](vsc/README.md): scripts to build and package Code-OSS (the open-source core of VS Code) as "DreamOS Code" with `open-vsc-claude` bundled. In WSL: `npm ci` and the gulp package step succeeded, the final Copilot step failed (cause not investigated), bundling and `verify.sh` have not run — resume via [`vsc/BUILD-REPORT.md`](vsc/BUILD-REPORT.md).*
 
 > 📌 **最近の更新(2026-08-08)**: `dream-os-raid-bridge`(open-raid-zの
 > RAID6/Z2実装ブリッジ)に、テストコードを読まなくても1コマンドで動作

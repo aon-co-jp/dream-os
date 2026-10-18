@@ -3,16 +3,24 @@
 ## 2026-10-18 時点 / Status as of 2026-10-18
 
 **日本語**
-- 環境: WSL2 Ubuntu 26.04(32コア、RAM 15GB、ext4に936GB空き)。Windows 側から `wsl -u root apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config make g++ python3 git curl xz-utils` で依存を導入済み(パスワード不要)。
-- `build.sh` の進捗(`~/dream-vsc/.done-*` の完了印): **node ✅ / clone ✅(`microsoft/vscode` 1.142.0)/ install ✅(`npm ci`)/ package ❌(未完了)/ bundle ❌**。
-  Windows の再起動で、`gulp` によるパッケージ化の途中で中断した。**パッケージ化以降は未検証**(`verify.sh` も未実行)。「ビルドできた」とはまだ言えない。
-- 再開: そのまま `build.sh` を再実行すれば、完了印のある段階を飛ばして `package` から続きます。
+- 環境: WSL2 Ubuntu 26.04(32コア、RAM 15GB、ext4に936GB空き)。依存は `wsl -u root apt-get install -y ...` で導入済み(パスワード不要)。
+- `build.sh` の進捗(`~/dream-vsc/.done-*`): **node ✅ / clone ✅(`microsoft/vscode` 1.142.0)/ install ✅(`npm ci`)/ package ❌ / bundle ❌**。
+- 1回目の `package`: `vscode-linux-x64-min-ci` を選んだため `out-vscode-min/...` が無く `ENOENT` で失敗(**`-ci` 系は事前工程が前提**)。`build.sh` を `vscode-linux-x64-min` 優先に修正した。
+- 2回目の `package`(約12分): compile・bundle・minify・**`package-linux-x64` まで成功**(出力 `~/dream-vsc/VSCode-linux-x64`)。その後の最終工程 `prepareBuiltInCopilotRipgrepShim` が
+  `Copilot SDK directory not found at .../extensions/copilot/node_modules/@github/copilot/sdk` で失敗して終了。**原因は未調査**(`inspect.sh` を作ったが結果は未取得)。
+- 未実行: `open-vsc-claude` の同梱(bundle 段階)、`verify.sh`。したがって「ビルドできた」とはまだ言えない。
+- 方針の案(原因を確かめてから選ぶ): DreamOS Code は GitHub Copilot を同梱する必要が無いので、Copilot の組み込みと最終工程を外す。
+- 再開: `build.sh` を再実行すると `package` 段階から(`vscode-linux-x64-min`)やり直す。出力が既にあるので、確認用に `inspect.sh` を先に見るとよい。
 
 **English**
-- Environment: WSL2 Ubuntu 26.04 (32 cores, 15 GB RAM, 936 GB free on ext4). Dependencies were installed from Windows with `wsl -u root apt-get install -y libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev pkg-config make g++ python3 git curl xz-utils` (no password needed).
-- `build.sh` progress (stamps in `~/dream-vsc/.done-*`): **node ✅ / clone ✅ (`microsoft/vscode` 1.142.0) / install ✅ (`npm ci`) / package ❌ / bundle ❌**.
-  The Windows restart interrupted the `gulp` packaging. **Everything from packaging onward is unverified** (`verify.sh` has not been run) — do not claim "it builds" yet.
-- Resume: just run `build.sh` again; it skips stamped stages and continues at `package`.
+- Environment: WSL2 Ubuntu 26.04 (32 cores, 15 GB RAM, 936 GB free on ext4). Dependencies installed with `wsl -u root apt-get install -y ...` (no password needed).
+- `build.sh` progress (`~/dream-vsc/.done-*`): **node ✅ / clone ✅ (`microsoft/vscode` 1.142.0) / install ✅ (`npm ci`) / package ❌ / bundle ❌**.
+- First `package` run: picked `vscode-linux-x64-min-ci`, which needs `out-vscode-min/...` from earlier stages and failed with `ENOENT` (**the `-ci` tasks assume earlier stages**). `build.sh` now prefers `vscode-linux-x64-min`.
+- Second `package` run (about 12 min): compile, bundle, minify and **`package-linux-x64` succeeded** (output `~/dream-vsc/VSCode-linux-x64`). The final step `prepareBuiltInCopilotRipgrepShim` then failed with
+  `Copilot SDK directory not found at .../extensions/copilot/node_modules/@github/copilot/sdk`. **Cause not investigated** (`inspect.sh` was written but its result was never read).
+- Not run: bundling `open-vsc-claude` (bundle stage) and `verify.sh`. So do not claim it builds yet.
+- Idea (choose after confirming the cause): DreamOS Code does not need to ship GitHub Copilot, so drop the built-in Copilot and that final step.
+- Resume: running `build.sh` again redoes the `package` stage (`vscode-linux-x64-min`). Output already exists, so read `inspect.sh` output first.
 
 ## 再開コマンド / Resume commands (PowerShell)
 
