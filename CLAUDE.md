@@ -1,0 +1,1950 @@
+# 設計思想＆開発方針＆開発環境ルール(DreamOS / dream-os)
+
+作業ドライブは`F:\runo`。この節は[`open-raid-z`](https://github.com/aon-co-jp/open-raid-z)の
+`CLAUDE.md`を正本とし、各プロジェクトへコピーして同期する方針に準じる。
+GitHubリポジトリ: [aon-co-jp/dream-os](https://github.com/aon-co-jp/dream-os)。
+
+**構想開始日: 2026-08-06**(このリポジトリへの構想文書着手日。GitHub上の空リポジトリ
+自体は2026-07-01に作成済みだった、`open-directx`と同じパターン)。
+
+## 🔁 お引越し・再開用メッセージ / Resume message (2026-10-18)
+
+**日本語(次のセッションの Claude へ)**
+1. まず `F:\dream-os\vsc\BUILD-REPORT.md` を読む。DreamOS Code(Code-OSS 1.142.0、WSL2 の Ubuntu で `build.sh`)は、**node・clone・`npm ci` が完了し、`gulp vscode-linux-x64-min` も compile / bundle / minify / `package-linux-x64` まで成功**している(出力は `~/dream-vsc/VSCode-linux-x64`)。ただし**最後の工程 `prepareBuiltInCopilotRipgrepShim` が「Copilot SDK directory not found」で失敗**して終わっており、原因は**未調査**(調べ始めた `vsc/inspect.sh` の結果は未取得)。**`open-vsc-claude` の同梱・`verify.sh` は未実行なので「ビルドできた」とはまだ言えない**。
+2. 次の手: (a) `wsl -d Ubuntu -- bash /mnt/f/dream-os/vsc/inspect.sh`(PowerShell)で、`build/gulpfile.vscode.ts` の Copilot 関連の配線と `extensions/copilot/node_modules/@github/copilot` の有無を確認、(b) DreamOS Code は GitHub Copilot を同梱する必要が無いので、Copilot の組み込みと最終工程を外す(`build.sh` の `package` 段階の前にソースを調整、または失敗後の出力をそのまま使う)方針を、**原因を確かめてから**選ぶ、(c) `build.sh` の bundle 段階(拡張同梱・`product-overlay.json`)→ `verify.sh`(Xvfb が要るなら `wsl -u root apt-get install -y xvfb`)、(d) 結果を `BUILD-REPORT.md` に正直に書いて `vsc/` をコミット。`-ci` 系タスクは事前工程が前提で単独では失敗する(`vscode-linux-x64-min` を使う、修正済み)。
+3. `open-vsc-claude` は v0.1.2 を公開済み(`F:\open-vsc-claude`、デモ `https://easy-web.tokyo/open-vps-claude/`、テスト 4 種が通る、VS Code 1.85 / VSCodium 1.140 / Web 拡張ホストで確認)。**未了**: Marketplace / Open VSX 公開(所有者のアカウントとトークンが必要。手順は `PUBLISHING.md`)、Cosmo Router の実起動、実キーでの Claude 生成、実機 iOS/Android、翻訳のネイティブ確認。RPoem の外部サブグラフ中継は `babc658` で反映済み。
+4. 秘密(トークン・API キー)はリポジトリに入れない。`F:\` 直下の txt に置き、値を画面・コミットに出さない。
+5. 落とし穴: Git Bash は `/mnt/...` を書き換える(PowerShell を使う)、PowerShell の引用符内の `|` や `$変数` は WSL に渡る前に解釈される(処理は `.sh` に書く)、シェルの heredoc で python に `\n` を渡すと本物の改行になる(補助スクリプトは先にファイルへ)、CRLF のファイルは置換が静かに失敗する(Edit ツールを使う)、書き換え済みリポジトリで `git pull` しない。
+
+**English (for the next Claude session)**
+1. Read `F:\dream-os\vsc\BUILD-REPORT.md` first. DreamOS Code (Code-OSS 1.142.0, `build.sh` in WSL2 Ubuntu): **node, clone and `npm ci` are done, and `gulp vscode-linux-x64-min` got through compile / bundle / minify / `package-linux-x64`** (output in `~/dream-vsc/VSCode-linux-x64`). But the **last step `prepareBuiltInCopilotRipgrepShim` failed with "Copilot SDK directory not found"**, and the cause is **not investigated yet** (the result of `vsc/inspect.sh`, started to look into it, was never read). **Bundling `open-vsc-claude` and `verify.sh` have not run, so do not claim it builds yet.**
+2. Next: (a) from PowerShell run `wsl -d Ubuntu -- bash /mnt/f/dream-os/vsc/inspect.sh` to see how `build/gulpfile.vscode.ts` wires Copilot and whether `extensions/copilot/node_modules/@github/copilot` exists, (b) DreamOS Code has no need to ship GitHub Copilot, so choose — **after confirming the cause** — to drop the built-in Copilot and that final step (adjust the source before the `package` stage in `build.sh`, or reuse the already packaged output), (c) run `build.sh`'s bundle stage (extension + `product-overlay.json`), then `verify.sh` (if Xvfb is missing: `wsl -u root apt-get install -y xvfb`), (d) record the real result in `BUILD-REPORT.md` and commit `vsc/`. The `-ci` tasks assume earlier stages and fail alone (use `vscode-linux-x64-min`; already fixed).
+3. `open-vsc-claude` v0.1.2 is released (`F:\open-vsc-claude`, demo `https://easy-web.tokyo/open-vps-claude/`, all four test suites pass; verified on VS Code 1.85, VSCodium 1.140 and the web extension host). **Open**: Marketplace / Open VSX publication (owner account + token; see `PUBLISHING.md`), running the Cosmo Router, Claude generation with a real key, real iOS/Android devices, native review of translations. RPoem's external-subgraph forwarding is in (`babc658`).
+4. Never put secrets (tokens, API keys) in repositories; keep them in txt files at the root of `F:\` and never print or commit their values.
+5. Pitfalls: Git Bash rewrites `/mnt/...` (use PowerShell); `|` and `$vars` inside quoted PowerShell strings are interpreted before reaching WSL (put logic in a `.sh`); escapes in shell heredocs turn `\n` into real newlines (write helper scripts to files first); CRLF files make scripted replacement fail silently (use the Edit tool); never `git pull` in rewritten repositories.
+
+## このプロジェクトの役割(構想段階、コード未着手)
+
+**DreamOS**(リポジトリ名・VPS/ローカルフォルダ名は`dream-os`)は、
+**世の中に存在するほとんどのOSを統合・融合する、LinuxとTRON OSの
+ハイブリッドカーネル**を目指す(ユーザー指示、2026-08-06)。単一の
+カーネル上で、Windowsのpowershell・macOS/iPhoneアプリ・Androidアプリが
+それぞれ互換性を保ったまま動作することを最終目標とする。裏付けとして
+ユーザーが挙げている論拠: 「Claude Code Desktop上でRust+RPoem
+(Poem互換)でアプリ/WEBサイトを開発すれば、インストーラーだけを
+プラットフォームごとに用意し、システム自体は単一の万能互換基盤として
+開発できる」という考え方。
+
+**現時点ではコードは一切書かれておらず、構想フェーズのみ**。この
+`CLAUDE.md`・[`README.md`](README.md)・[`PORTING.md`](PORTING.md)で
+目的・スコープ・エコシステム内での位置づけ・**技術調査結果**を文書化
+することが今回の唯一の成果物。
+
+## 技術調査結果(2026-08-06、日英でのGoogle/GitHub検索に基づく、正直な開示)
+
+ユーザー指示「まずは、日本語と英語でGoogleとGithub検索と調査から
+始めて下さい」を受けて実施した調査。**結論を先に書く: 「Linuxと
+TRON OSのハイブリッドカーネルで、Windows/macOS/iPhone/Androidの
+アプリを単一カーネル上でネイティブ互換動作させる」という構想を
+そのまま実現した既存のOSS実装・商用製品は見つからなかった。**
+以下、要素ごとの調査結果と、現実的な代替アーキテクチャの検討。
+
+### 1. Linux×TRON OSのハイブリッドカーネルについて
+
+- **学術的な先行研究は実在する**: 2001年のIEEE論文
+  ["Linux on ITRON": a hybrid operating system architecture for embedded systems](https://ieeexplore.ieee.org/document/994546/)
+  が、汎用OS(Linux)とリアルタイムOS(μITRON仕様)を組み合わせた
+  ハイブリッドアーキテクチャを提案している。ただし対象は**組み込み
+  システムのリアルタイム制御**であり、「様々なアプリ互換性を持つ
+  汎用デスクトップ/モバイルOS」という今回の目的とは方向性が異なる。
+  また2001年の研究で、現在活発にメンテナンスされているOSSプロジェクト
+  としては見つからなかった。
+- **TRON Forum公式のT-Kernel 2.0**([GitHub: tron-forum/tkernel_2](https://github.com/tron-forum/tkernel_2))は
+  現在も組み込み向けリアルタイムOSとして開発が続いている
+  ([tron.org](https://www.tron.org/tron-project/what-is-t-kernel/t-kernel-2-0/))が、
+  Linuxとの統合(ハイブリッドカーネル化)を謳った現行プロジェクトは
+  見当たらなかった。
+- **アーキテクチャ上の根本的な相性の悪さの指摘**: 調査で見つかった
+  分析([Grokipedia記事](https://grokipedia.com/page/TRON_project)より)
+  では、「TRONの決定論的リアルタイムカーネル・リソース分割設計は、
+  Unix由来でプロセス指向・汎用互換性を優先するPOSIXモデルと衝突し、
+  POSIX中心のエコシステムへの統合は非効率であることが実証されている」
+  との指摘があった。組み込みRTOS市場でもTRON系は5%未満のシェアに
+  留まり、FreeRTOS・VxWorks等に押されているとの分析もあった。
+  **正直な評価**: TRONとLinuxを文字通り1つのカーネルへ融合するのは、
+  学術的に一度試みられたが主流化しなかった、技術的難度の高いアプローチ
+  だと考えられる。
+- **GitHubでの実際の検索結果**: `hybrid kernel TRON`
+  ・`hybrid kernel TRON Linux`等のキーワードでリポジトリ検索を行った
+  ところ、該当する実装プロジェクトは0件だった(2026-08-06実施)。
+
+### 2. 「1つのOS上でWindows/macOS/Androidアプリを同時に動かす」実例調査
+
+個別プラットフォームの互換レイヤーは複数実在するが、**単一の統合OSとして
+全てを同時に提供する製品・OSSは見つからなかった**。実在する個別要素技術:
+
+| 対象 | 技術 | 方式 | 成熟度 |
+|---|---|---|---|
+| Windows→Linux | [Wine](https://www.winehq.org/)/[Proton](https://github.com/ValveSoftware/Proton)(Valve) | アプリ層でのWin32 API実装(カーネル統合ではない) | 高(Steam Deck等で実運用) |
+| macOS→Linux | [Darling](https://www.darlinghq.org/) | Mach-O/Darwin ABI互換層 | 限定的(macOS本体ほどの網羅性は無い、開発ペースも緩やか) |
+| Android→Linux | [Waydroid](https://lwn.net/Articles/901459/) | LXC/namespaceでAndroidをコンテナ実行(AndroidもLinuxカーネルベースなので比較的容易) | 高(実用レベル) |
+| iOS(iPhone)→他OS | (無し、下記参照) | — | 事実上不可能 |
+
+**最も参考になった実例**: **ChromeOS**が、Crostini(Linux、KVM経由の
+`crosvm`——Rust製VMM)・ARCVM(Android、同じく`crosvm`上でAndroid
+スタック全体をVM実行)という**複数ゲストOSを共通のVMMインフラ
+(`crosvm`)上で動かす**方式を実際に本番採用している
+([google/crosvm](https://github.com/google/crosvm))。「1つのカーネルへ
+全てのOSのABIを直接実装する」のではなく、「軽量VM/コンテナごとに
+各OSをホストし、共通基盤で統一的に管理する」という設計であり、これが
+現実に量産・商用展開されている最も近い先例だと考えられる。
+
+**もう1つの参考先例**: **seL4マイクロカーネル**上に、複数OSの
+「パーソナリティ」(人格)を載せる研究がある。[Neptune OS](https://www.theregister.com/2022/02/24/neptune_os_sel4_windows/)は
+seL4上にWindows NT互換のNTOSKRNL実行層を実装するプロジェクト、
+[Genode OSフレームワーク](https://genode.org/)はseL4等のL4系
+マイクロカーネル上でLinux(CAmkES VM経由)を含む複数OS環境を
+コンポーネントとして構成する仕組みを提供している。これも「1つの
+物理カーネルバイナリに全部の互換コードを書き込む」のではなく、
+「マイクロカーネル+各OS用の実行パーソナリティを分離コンポーネント
+として積み上げる」設計思想である。
+
+### 2.5. メインフレーム(IBM z/OS系・AWS版)互換性について(2026-08-06追加調査)
+
+ユーザー指示「dream-osに、汎用機(メインフレーム)OSのIBMとその他の
+バージョンとAWS版のメインフレームなども取り込んで互換性を保って」への
+対応として調査。**結論**: 汎用機OS(z/OS等)を「取り込んで互換性を保つ」
+には、命令セットエミュレーションと実OSライセンスという**別々の2つの
+壁**があり、後者はこのエコシステムの他の保留プラットフォーム
+(macOS/iPhone・PS5/6・Switch2)と同種の「ライセンス取得待ち」問題である
+ことが分かった。
+
+- **[Hercules](http://www.hercules-390.org/)(命令セットエミュレータ、
+  OSS/OSI認定ライセンス)**: System/370・ESA/390・64bit
+  z/Architectureの命令セット・チャネルプログラムをソフトウェアで
+  実装したエミュレータ。1999年開発開始、現在も
+  [sdl-hercules-390](https://sdl-hercules-390.github.io/html/hercfaq.html)
+  としてアクティブにメンテナンスされている。Windows/Linux/macOS/
+  Solaris/FreeBSDに対応(2026年4月時点でIBM AIX/POWERへの
+  ネイティブ移植も進んでいるとの情報あり)。**重要な制約**: Herculesは
+  あくまで「CPU命令セット+入出力デバイスのエミュレーション」であり、
+  **OS自体は同梱しない**——動かすには別途OSイメージ(ディスク/テープ
+  イメージ)が必要。
+- **z/OS自体のライセンス問題(最大の壁)**: 調査結果より引用——
+  「OS/390・z/OS、およびその他のESA/z/Architecture OSは特定の
+  マシンにライセンスされており、実際にIBMからライセンスを取得しない
+  限りPC上で動かすことはできない」。**したがって、実際のIBM z/OSを
+  DreamOSへ合法的に組み込むことは現時点で不可能**——ライセンス費用・
+  IBM社との契約が別途必要。ホビイスト向けに合法的に動かせるものとしては
+  **MVS 3.8j**(1970年代のIBM製OS、著作権が事実上パブリックドメイン
+  扱いとして広く配布されている)が実務上の唯一の選択肢だが、これは
+  現行のz/OSとはアーキテクチャ世代が大きく異なる(z/Architectureでは
+  なくSystem/370世代)。
+- **「AWS版のメインフレーム」について**: 調査の結果、これは
+  **エミュレートされたメインフレームOSという意味ではなく、
+  [AWS Mainframe Modernization](https://docs.aws.amazon.com/prescriptive-guidance/latest/replatform-mainframe-apps-shared-db2/mainframe-modernization.html)/
+  [AWS Transform for mainframe](https://aws.amazon.com/about-aws/whats-new/2025/05/aws-transform-mainframe-generally-available)
+  という、既存z/OSアプリ(COBOL/PL1等)をクラウドへ移行・
+  リプラットフォーム/リファクタリングするための**AWSのマネージド
+  サービス・ツール群**であると判明した。つまり「メインフレームOSの
+  実行環境そのもの」ではなく「メインフレーム上で動いていたアプリケー
+  ションをクラウドネイティブなアーキテクチャへ変換する開発支援
+  サービス」であり、DreamOSが目指す「OSレベルの互換性」とは**そもそも
+  対象のレイヤーが異なる**(アプリケーション移行ツールであり、
+  カーネル/OS互換レイヤーではない)。z/OS上のCOBOLプログラムをx86
+  (Linux/Windows)上でそのまま動かすには、Micro Focus Enterprise
+  Server等の別のツールセットでの互換性エラー対応が必要になる、との
+  記述も確認した。
+- **正直な結論**: (1) 命令セットエミュレーション自体(Hercules)は
+  OSSで実在し合法的に利用可能——これはDreamOSに技術的に組み込める
+  可能性がある要素。(2) しかし実際のz/OS・その後継OSを動かすには
+  IBMからの正式ライセンスが必須で、現時点でこのエコシステムには
+  それが無い。(3) 「AWS版メインフレーム」は互換レイヤーではなく
+  別レイヤーの移行支援サービスであり、DreamOS側で「互換性を保つ」
+  対象として直接統合する性質のものではない。
+
+### 3. iOS(iPhone)アプリの互換動作について(重要な制約、正直な開示)
+
+**Apple純正ハードウェア以外でiOSアプリをネイティブ動作させる実用的な
+方法は、2026年時点で存在しない。** 調査で判明した技術的制約:
+
+- iOSはサードパーティアプリのサンドボックス内でのJITコンパイルを
+  OSレベルで全面禁止している。エミュレータの多くはバイトコードの
+  高速実行にJITを要するため、この制約に直接抵触する。
+- ハードウェア仮想化機能・カーネルレベルのシステムアクセスも
+  サードパーティアプリからは完全にブロックされている。
+- 2026年時点で実用とされる代替手段は、いずれも**Apple製の実機上で
+  クラウド/ストリーミング経由**か、Safari上のWebAssembly実行に
+  限られる(TestMu AI・Redfinger等のクラウドAndroidストリーミング、
+  Safari上でのゲームROM WASM実行等)——「Apple以外のハードウェア上で
+  iOSアプリのバイナリをネイティブ実行する」というシナリオを満たす
+  ものは見つからなかった。
+- 非ジェイルブレイクのサイドローディング(AltStore/TrollStore経由の
+  DolphiniOS等)も**Apple実機上でのみ**動作するiOSエミュレータであり、
+  「他OS上でiOSアプリを動かす」話とは別物。
+
+**正直な評価**: iOSアプリ互換性は、技術的制約(Apple自身による
+JIT/仮想化ブロック)に加え、Apple Developer Program
+利用規約・DMCA等の法的リスクも伴う領域であり、DreamOSのスコープに
+含める場合は「Apple公式のクロスプラットフォームフレームワーク
+(Mac Catalyst等)経由でのアプリ移植を促す」等、ネイティブiOSバイナリの
+直接実行以外のアプローチを検討する必要がある。**この制約は今回の
+調査で最も重要な発見であり、ユーザーに直接お伝えする**。
+
+### 4. 「Windowsのpowershellが動く」について
+
+これは既に**解決済みの技術**である。PowerShell(pwsh、PowerShell Core)は
+.NET Core化されて以降オープンソース・クロスプラットフォーム化されており、
+Linux/macOS上でネイティブに(WSL等の仮想化を介さず)動作する
+(`apt install powershell`等で導入可能)。DreamOSがLinuxベースの
+カーネルを採用するなら、pwshバイナリを同梱するだけでこの要件は
+満たせる——独自実装の必要は無い。
+
+### 5. 現実的なアーキテクチャ方針(暫定案、次回以降で要検討)
+
+上記調査を踏まえた、次回セッション以降で検討すべき現実的な方向性:
+
+1. **「1つのモノリシックなハイブリッドカーネル」ではなく、「Linuxカーネル
+   をベースに、各OS向けの軽量VM/コンテナ・互換レイヤーを統一管理する」
+   というChromeOS/crosvm型のアーキテクチャが最も実績があり現実的**。
+2. Windows対応: Wine/Proton(またはvkd3d-proton、`open-directx`が
+   目指す方向性とも合流できる可能性)を統合。
+3. Android対応: Waydroid相当のコンテナ方式(Androidが元々Linuxカーネル
+   ベースなので技術的難度は比較的低い)。
+4. macOS対応: Darling(現状の成熟度は限定的、要継続調査)。
+5. iOS対応: ネイティブバイナリ直接実行は非現実的(上記4参照)。
+   Web/PWA経由の代替アプローチか、公式クロスプラットフォームSDK経由の
+   移植支援ツールとしての位置づけを検討。
+6. TRON/ITRONは、「デスクトップ/モバイル向け汎用互換OS」の基盤としてよりは、
+   組み込み機器向けの将来分岐(PS5/6・Switch2等のゲーム機は独自RTOSに
+   近い制約を持つ可能性がある)で再検討する方が筋が良い可能性がある。
+7. RPoem/open-directx等、このエコシステムが既に持つRust製の
+   クロスプラットフォーム実行基盤(Vulkan経由のGPU抽象化等)を、
+   DreamOSの「共通実行基盤」として再利用できないか、open-directxの
+   完成度が上がった段階で具体的に検討する。
+
+## エコシステム内での位置づけ(既存プロジェクトとの関係、正直な暫定案)
+
+- **[`open-directx`](https://github.com/aon-co-jp/open-directx)**:
+  Windows専用API(DirectX)で書かれた既存アプリ/ゲームを、Linux・
+  Android・将来的にはmacOS・PlayStationファミリーでも動かす
+  クロスプラットフォームDirectX互換層(D3D API呼び出しのインターセプト+
+  DXBC/DXILシェーダーの実行時翻訳→Vulkan実行、2026-07-25開発着手)。
+  **ユーザー指示により、DreamOSより先にopen-directx自体の完成度を
+  優先して高める方針**(2026-08-06時点)。
+- **[`open-cuda`](https://github.com/aon-co-jp/open-cuda)**:
+  CUDA互換のGPU計算基盤(`opencuda-vulkan`が実Vulkanバックエンド)。
+  open-directxが実行時にVulkanディスパッチを行う際の基盤として既に
+  利用されている。
+- **[`aruaru-llm`](https://github.com/aon-co-jp/aruaru-llm)**:
+  LLM推論(GPT-2等)、`open-cuda`のVulkan GEMM/softmaxカーネルを利用。
+
+DreamOSがこれらとどう統合されるか(例: open-directxのVulkan実行基盤を
+共有アプリケーションサービス層として再利用する、複数プラットフォームへの
+配布・パッケージング機構を提供する等)は**未確定**。推測で設計図を
+確定させず、まずopen-directxの完成度向上(現在最優先で進行中)を通じて
+「実際に複数OS上でクロスプラットフォームな実行基盤がどう機能するか」の
+実証を積んでから、DreamOSのスコープを具体化する方針とする。
+
+## 対応プラットフォーム(ロードマップ、2026-08-06に実機ベースで更新)
+
+**フェーズ0(現在)**: 構想・文書化のみ。
+
+**フェーズ1(実機あり、今すぐ着手可能)**:
+1. Windows(NVIDIA GT730搭載PC実機)
+2. Android(スマホ数台実機)
+
+**フェーズ2以降(将来、ライセンス/許諾取得を前提とした保留)**:
+3. macOS / iPhone / **iPad(2026-08-17追加)**(Apple Developer Program。
+   iPhone/iPad側は上記調査結果の技術的制約——非公式ハードウェアでの
+   ネイティブ実行が不可能——も残る)
+4. 各種Linuxディストリビューション・UNIX系(BSD等)
+5. SONY PlayStation 5 / PlayStation 6(公式開発機材・NDA)
+6. Nintendo Switch 2 / **Switch 3(2026-08-17追加、まだ発表されていない
+   将来機種——現時点では名称・仕様とも公式情報が存在しないため、
+   Switch 2と同じ「公式開発機材・NDA取得後」という前提のプレース
+   ホルダーとして記載するに留める)**
+7. **IBMメインフレーム(z/OS系)互換(2026-08-06追加)**: 命令セット
+   エミュレーション自体(Hercules、OSS)は技術的に組み込み可能な要素だが、
+   実際のz/OS実行にはIBMからの正式ライセンスが必要(現時点で未取得)。
+   「AWS版メインフレーム」はOS互換レイヤーではなくアプリケーション移行
+   支援サービス(詳細は上記「技術調査結果」2.5節参照)であり、DreamOS側で
+   直接統合する対象ではないと判断。
+
+**正直な開示**: macOS/iPhone/iPad・PS5/6・Switch2/3・IBMメインフレーム
+(z/OS系)は各社の非公開SDK・NDA・実機/開発機材・正式ライセンスが必須で
+あり、現時点でこのエコシステムに実機・SDK・開発者ライセンスは一切無い。
+**Switch 3は2026-08-17時点で任天堂から公式発表されていない将来機種であり、
+このロードマップ記載は「もし発表・発売されたら検討する」という
+プレースホルダーに過ぎず、実在の製品情報に基づくものではない**(誇張
+しないための明記)。ユーザーの2026-08-06指示により「将来ライセンスが
+取得できたら着手する」という前提の保留とし、まずは実機のある
+Windows・Androidから着手する方針とした(詳細は下記「スコープの絞り込み」
+節参照)。
+
+## 長期ビジョンの詳細化(2026-08-08、ユーザー指示「あくまで野心として」)
+
+ユーザーから、最終到達点(野心)としてのDreamOSカーネル像がより具体的に
+示された。**ユーザー自身が「あくまで野心として」と明言している**ため、
+これは上記「スコープの絞り込み」節が定める**現実的な近未来の着手範囲
+(Windows実機+Android実機のみ)を変更するものではなく**、その先にある
+最終ゴールの解像度を上げる位置づけの記録である。
+
+- **カーネルの中核**: LinuxとAndroid OS(Linuxカーネルベース)を中心に
+  据える。
+- **Windows互換**: PowerShell、Windowsの3DオンラインゲームアプリやCAD
+  アプリが高速・スムーズに動作すること。
+- **Linux/macOSアプリ互換**も前提とする。
+- **ゲーム機互換(将来予定)**: PS6(2026-08-08時点で未発売・未発表の
+  次世代機)のゲームが4K120FPS相当で動作すること、Nintendo Switch 2の
+  ゲームアプリの動作互換も予定。
+
+## Dolby Vision 2 Max: PS6専用ではなく汎用ディスプレイ規格と判明(2026-08-08訂正、ユーザー指摘+Web検索での再確認)
+
+前回HANDOFFで「Dolby Vision 2 Max」をPS6互換(ライセンス取得待ちの将来
+課題)の一部として記録していたが、**ユーザーから「PS6でなくてもPCの
+規格かもしれない、今のハードウェアが未対応でも今のうちに対応を」との
+指摘があり、日英Web検索で再確認した結果、これは正しい指摘だった**。
+
+**実際の裏付け(2026-08-08、Web検索で確認)**: Dolby Vision 2は
+**Dolby社が2026年に展開を開始した汎用HDRディスプレイ規格**であり、
+PlayStationを含むいかなるゲーム機とも無関係——**Hisense(UX/UR9/UR8/U7
+シリーズ)・Philips(OLED811等の2026年OLEDテレビ)・TCL(X QD-Mini LED・
+2026年C-series)が2026年発売の一般消費者向けテレビとして搭載**する
+([Sports Video Group](https://www.sportsvideo.org/2026/08/06/dolby-vision-2-begins-rollout-on-select-2026-hisense-tvs/)、
+[Forbes](https://www.forbes.com/sites/johnarcher/2026/08/06/dolby-vision-2-arrives-on-hisense-tvs/)、
+[Display Daily](https://displaydaily.com/dolby-vision-2-arrived-at-ces-2026-with-hisense-tcl-and-philips-as-launch-partners/)、
+[FlatpanelsHD](https://www.flatpanelshd.com/news.php?subaction=showfull&id=1773748802))。
+**標準版「Dolby Vision 2」+上位版「Dolby Vision 2 Max」の2階層構成**
+(Max版はAuthentic Motion〈判断的フレーム補間ではないモーション処理〉・
+Light Sense 2〈周辺光に応じた表示調整〉を追加)。
+
+**ビット深度12bit・最大輝度10,000nits・色域BT.2020という仕様
+(ユーザー提供の出典、phileweb.com/totalnavi.net)は今回のWeb検索では
+直接の再確認はできなかった**が、Dolby Vision 2自体が実在し2026年に
+実際のテレビへ展開中という大枠は確認できた——数値仕様の詳細は
+今後Dolby公式資料等でさらに裏取りする余地がある。
+
+**結論・方針転換**: Dolby Vision 2 MaxはPS6互換のライセンス待ち項目
+ではなく、**HDMI経由でPC/DreamOSからテレビ・モニターへ直接出力する
+一般的な映像パイプラインの目標仕様として、PS6互換とは独立に今から
+準備を始めるべき**——ユーザー指摘の通り、現在この開発機に対応
+ディスプレイが無くても、ソフトウェア側の色深度・輝度・色域の
+パイプライン設計(12bit・HDR輝度メタデータ・BT.2020色域変換)を
+先行して用意しておく価値がある。**正直な開示**: 現時点でこの開発
+環境にはDolby Vision 2/Max認証済みディスプレイが無く、実機での
+表示確認は不可能——ソフトウェア側の色空間変換・ビット深度処理の
+実装・単体テストまでは今のハードウェアでも可能なので、次回はその
+範囲から着手する。
+
+## 表示解像度・業界標準化の展望+次世代メモリ技術の調査(2026-08-08、ユーザー提案+日英Web検索)
+
+ユーザー提案「PS6の4K120FPS対応がWindows/Mac/Linux/Nintendo Switch
+2〜3も歩調を合わせる業界標準の合言葉になりうる」「16Kモニター対応・
+8K(未確認)も視野に、ユニファイドメモリ・サイメモリー・MRAM等の
+融合ハイテクメモリの省電力・高速化技術も考慮しておいて」を検討した。
+
+### 表示解像度・フレームレートの業界標準化について
+
+Dolby Vision 2/Max(上記参照)と同様、**4K@120FPSは既に特定の
+コンソール専用ではなく、HDMI 2.1世代のテレビ・モニター・PC/Mac/Linux
+機全般で共通の業界横断的な目標値になりつつある**という方向性は
+妥当と考えられる(HDMI 2.1自体が4K@120Hzを標準的にサポートする
+汎用規格のため)。**16K/8Kモニターについては今回具体的な製品化状況の
+裏取りは行っていない**(正直な開示、次回の調査候補)。DreamOSの
+映像パイプライン設計としては、Dolby Vision 2 Maxと同じ考え方(特定の
+コンソール専用機能に依存せず、解像度・フレームレートも設定可能な
+パラメータとして抽象化する)を踏襲するのが妥当。
+
+### 次世代メモリ技術の調査結果
+
+- **SAIMEMORY(サイメモリ)/ ZAM(Z-Angle Memory)**: ユーザー提供情報+
+  Web検索の両方で実在を確認した、**日本発の国家プロジェクト**。
+  ソフトバンクの100%子会社SAIMEMORY(2024年12月設立、2025年5月に
+  現社名へ変更、代表: 山口秀哉氏)が米Intelと協業し、AI向け大容量・
+  省電力メモリー「ZAM」の実用化を推進
+  ([SoftBank公式](https://www.softbank.jp/corp/news/press/sbkk/2026/20260203_01/)、
+  [日経](https://www.nikkei.com/article/DGXZQOUC2274X0S6A420C2000000/))。
+  - **技術的特徴**: メモリーを縦に並べて放熱しやすくする独自構造
+    (Z-Angle)、Intel「Next Generation DRAM Bonding (NGDB)」の要素技術を
+    活用。**従来のHBM(広帯域メモリ)比で消費電力を約40%削減**しつつ
+    大規模AIモデルの処理性能向上に寄与する設計
+    ([Yahoo!ニュース](https://news.yahoo.co.jp/articles/61322d0f061db75b6e2cc4b5edab059691c1138b))。
+  - **開発体制・資金**: NEDO(新エネルギー・産業技術総合開発機構)の
+    支援事業に採択、国からの資金援助に加え富士通・日本政策投資銀行等が
+    出資。
+  - **スケジュール**: 2026年運用開始、**2027年度中に試作品(プロトタイプ)**、
+    **2029年度中に実用化**を目標(英語圏の一部報道では2030年という
+    表記もあり、正確な年度は今後公式発表で再確認すること——正直な
+    開示として数字の揺れをそのまま記録)。
+  - **DreamOSへの示唆**: ZAMはデータセンター向けAI学習・推論用途が
+    主眼(HBMの直接的な代替候補)であり、コンシューマPC/DreamOS向けの
+    製品化時期は現時点で不明——**2029年度実用化目標という時間軸を
+    踏まえ、DreamOSのメモリ抽象化層は「将来ZAMのような新型メモリが
+    登場しても差し替えられる」設計(具体的なメモリ規格をハード
+    コードしない)を今のうちから意識しておく**、という指針に留める
+    (今回のスコープでは実装なし、方針記録のみ)。
+- **ユニファイドメモリ(Unified Memory)**: Apple Silicon(M-series)が
+  コンシューマ市場で普及させた、CPU/GPU/NPUが同一メモリプールを
+  共有しディスクリートGPU特有のオーバーヘッドを排除する設計。2026年
+  時点でAMDも「Ryzen AI Max」シリーズ(大型Radeon GPU+大容量LPDDR5x
+  統合、開発者向け「Ryzen AI Halo」は128GBユニファイドメモリ搭載)で
+  追随している
+  ([InsightTechDaily](https://insighttechdaily.com/apple-vs-amd-unified-memory-ai-pcs-2026/))。
+  仕組みとしては、CPU/GPU/NPU等の各パーツが同じ1つのメモリ領域を
+  共有することでデータコピーの手間・遅延を減らし処理を高速化する
+  (メリット: 動画編集・AI計算がスムーズに動く/省スペース。**デメリット:
+  設計上、後からメモリを自分で増設できない**——ユーザー提供情報、
+  [note.com](https://note.com/kagawatomo/n/nc3bbd102f765)、
+  [MacPaw](https://macpaw.com/ja/how-to/unified-memory-mac))。
+  **DreamOSへの示唆**: 「限られたVRAMでも大規模モデル/処理を動かす」
+  というこのエコシステムの一貫した課題意識(GT730の2GB VRAM制約等)に
+  対し、ユニファイドメモリは業界が実際に採用しつつある現実的な解の
+  1つ——ただしこれはハードウェア設計自体の話であり、DreamOS(ソフト
+  ウェア層)側で今すぐ実装できるものではない。**増設不可というトレード
+  オフがある以上、DreamOSのメモリ抽象化層は「ユニファイドメモリ機・
+  従来型ディスクリートGPU機の両方で動く」ことを前提に設計すべき**
+  (将来、ユニファイドメモリ搭載ハードウェアが入手できた際の対応設計
+  候補として記録)。
+- **MRAM(Magnetoresistive RAM、磁気抵抗ランダムアクセスメモリ)**:
+  電源を切ってもデータを保持する不揮発性と、SRAM並みの高速な読み書きを
+  両立する次世代半導体メモリ。磁化反転を利用するため原理的な書き換え
+  回数の上限が無くフラッシュメモリより圧倒的に高い耐久性を持ち、
+  待機時電力が不要で動作時も省電力(ユーザー提供情報、
+  [マクニカ](https://www.macnica.co.jp/business/semiconductor/articles/renesas/149834/)、
+  [ラムザイド](https://www.ramxeed.com/jp/tech-column/mram-in-memory-computing/))。
+  高速性・省電力性のバランスに優れる**STT-MRAM**(大規模商用化向き)と、
+  速度・耐久性の理論限界に迫る**SOT-MRAM**(次世代ユニファイドメモリ/
+  コンピューティング基盤の鍵技術)の2方式が存在
+  ([MDPI論文](https://www.mdpi.com/2079-4991/16/13/816))。**主な用途**は
+  組み込み・IoT・車載機器(頻繁なログ書き込み・ファームウェア高速
+  更新)、産業・航空宇宙(高温・高放射線環境での安定動作)、
+  ストレージ・AI(SSDキャッシュ・次世代インメモリコンピューティング)。
+  **DreamOSへの示唆**: MRAMも上記ZAM同様、コンシューマDreamOS向けの
+  具体的な採用時期は不明——ハードウェア入手可能性が無い現時点では
+  「将来対応の余地を残す抽象化設計」という方針以上のことは言えない
+  (正直な開示)。ただし組み込み・車載向けの高耐久性・不揮発性という
+  特性は、DreamOSが将来組み込み機器/車載機器へ展開する場合の実用的な
+  候補になりうる(現状はスコープ外、将来の展開先候補として記録のみ)。
+
+**総括**: 上記3技術(ZAM・ユニファイドメモリ・MRAM)はいずれも
+実在し、日英Web検索で裏付けが取れたが、**いずれもDreamOS側で今すぐ
+実装できる要素ではない**(ハードウェア入手不可、または対象がPC/
+コンシューマ向けではなくデータセンター向け)。今回のパスでは
+「将来対応の設計方針をCLAUDE.mdへ記録する」調査止まりとし、無理な
+実装や捏造した対応コードは追加していない。
+- 次にすべきこと: (1) 16K/8Kモニターの製品化状況の追加調査、
+  (2) ZAM/MRAMのコンシューマ向け製品化時期が判明次第、DreamOSの
+  メモリ抽象化層設計の具体化、(3) ユニファイドメモリ搭載ハードウェア
+  (Apple Silicon Mac、AMD Ryzen AI Max機等)が入手できた場合の実機
+  対応検討。
+
+**正直な評価(現時点の技術的距離)**: 上記は、Windows向けゲーム/CAD
+アプリを別OS上で高速に動かす(Wine/Protonのような互換レイヤー、または
+仮想化・GPUパススルーを伴うハイパーバイザー相当の技術)、および家庭用
+ゲーム機のソフトウェアを非公式に動作させる(コンソールエミュレーション)
+という、いずれも成熟した専門プロジェクト(Wine/Proton、QEMU/KVM、
+各種コンシューマ機エミュレータ)が何年もかけて築いてきた領域に相当する。
+現在の`dream-os`の実体(`crates/dream-os-kernel`のSBM Isingカーネル
+PoC・Android実機での`open-cuda`/`open-directx`連携PoC・本日追加した
+`dream-os-raid-bridge`)から見ると、この野心までの距離は非常に大きい
+——「野心として」の位置づけをそのまま維持し、当面のPoCはスコープの
+絞り込み節が定める実機ベースの範囲(Windows実機+Android実機)に
+留めることを推奨する。
+
+**法的・ライセンス面の留意事項(正直な開示)**: PS5/6・Nintendo Switch
+シリーズの正式な開発対応には各社の公式開発機材・NDA・ライセンスが必須
+(既存の「対応プラットフォーム」節に記載済み)。加えて、非公式な
+コンシューマ機ソフトウェア実行環境(エミュレーション)は、クリーン
+ルーム実装(リバースエンジニアリングのみに基づく独自実装)であれば
+一般に違法ではない国が多い一方、**製造元の暗号化キー・BIOS/ファーム
+ウェアの無断使用、DRM/コピープロテクションの回避は法域によって
+DMCA等の反回避規定に抵触しうる**——将来この領域へ実際に着手する場合は、
+必ず公式ライセンス経路(上記NDA取得)を前提とし、非公式な回避手段には
+踏み込まない方針を維持すること。
+
+## SOUND関連の技術提案(2026-08-08、ユーザー提案+日英Web検索での裏取り)
+
+ユーザー提案「Auro-CX・MQA・DSD・STEREOをGoogle検索した上で、最新の
+サラウンド技術とIMAXシアター・4DXシアターの音響・映像技術を、OS
+レベル・CPU実装レベル・GPU実装レベル・NPU実装レベルに近い部分と
+DirectX対応機能として将来搭載する」という構想を調査した(コード
+未着手、上記「長期ビジョン」と同じく提案・調査段階の記録)。
+
+- **Auro-3D / Auro-CX**: 5.1/7.1の水平サラウンドに高さ方向(オーバー
+  ヘッド)を加えた3Dイマーシブ音響フォーマット(Auro Technologies社、
+  ベルギー)。高さ情報を標準PCMへ重畳する方式のため、**非対応の
+  デコーダでも既存の5.1/7.1として問題なく再生できる後方互換性**を
+  持つ。Auro-CXは配信・放送向けの次世代コーデックとして開発が
+  継続中([auro-3d.com](https://www.auro-3d.com/)、
+  [Wikipedia](https://en.wikipedia.org/wiki/Auro-3D))。DreamOSで
+  検討する場合、既存のDolby Atmos/DTS:X同様「複数の空間音響
+  フォーマットの1つ」として抽象化層で扱うのが妥当と考えられる。
+- **MQA(正直な開示・市場動向に注意)**: 2026-08-08時点の調査で、
+  **MQAは市場から急速に後退している**ことが判明した——主要
+  ストリーミングサービスTidalが2024年7月にMQA対応を完全に打ち切り、
+  FLACへ移行済み([Audioengine](https://audioengine.com/explore/tidal-announces-they-are-dropping-support-for-mqa-hi-res-audio/)、
+  [Digital Trends](https://www.digitaltrends.com/home-theater/what-is-mqa/))。
+  理由は独自ライセンス費用(ストリーミング事業者への従量課金+
+  対応DACチップ必須)への批判。**「未来の技術」としてMQAを新規に
+  OS実装へ組み込む優先度は低いと判断する**——将来的に音源フォーマット
+  対応を拡張する場合は、オープンなFLAC(既に業界標準、24bit/192kHz)を
+  優先し、MQAは「過去に存在した独自規格」程度の位置づけに留めるのが
+  現実的([Speaker Feed](https://speakerfeed.com/hi-res-audio-file-formats-explained/))。
+
+  **MQA運営会社の経営状況(2026-08-08、ユーザーコメントへの裏取り)**:
+  ユーザーの「利用手数料が高すぎたり、経営会社が倒産したりして大変」
+  というコメントは事実に基づいている——**MQA Ltd.は2023年4月6日に
+  「administration」(英国におけるChapter 11相当の会社更生手続き)を
+  申請**、主要な資金提供者が撤退を決めたことが直接の引き金
+  ([What Hi-Fi?](https://www.whathifi.com/features/mqa-has-gone-into-administration-what-does-this-mean-for-tidal-and-supported-products)、
+  [Strata-gee.com](https://www.strata-gee.com/mqa-limited-enters-administration-in-u-k-similar-to-chapter-11-bankruptcy/))。
+  同年9月、カナダのLenbrook Industriesが資産を買収し
+  ([Strata-gee.com](https://www.strata-gee.com/mqa-limited-no-longer-exists-say-hello-to-wave-realisations-limited/))、
+  2024年初頭には買収後の器として「Lenbrook Media Group」が
+  MQA Labsを引き継いだ。**ユーザー提案「オープンソース化で生き
+  残ってもらいましょう」について**: 2026-08-08時点の調査では、
+  Lenbrook/Wave Realisations社がMQAをオープンソース化したという
+  公式発表・裏付けは見つからなかった——現状は引き続き買収先企業に
+  よる商用独自規格のまま運営されていると見られる(未確認、次回
+  セッションで公式発表があれば要更新)。DreamOS側の提案としては、
+  「MQAが将来的にオープンソース化された場合は、FLACと並ぶ選択肢
+  として再評価する」という条件付きの記述に留め、現時点で断定的に
+  「オープンソース化された」と記載しないこと。
+- **DSD(Direct Stream Digital)**: プロのアーカイブ・マスタリング
+  用途で使われる1bit高サンプリングレート方式、ファイルサイズが
+  非常に大きく専用ハードウェア/ソフトウェアでの再生が前提
+  ([audiointensity.com](https://audiointensity.com/blogs/dsp/high-resolution-audio))。
+  DoP(DSD over PCM)方式でのソフトウェアデコード対応であれば
+  DreamOS側での実装難度は比較的低いと考えられる(未検証、次回調査
+  候補)。
+
+  **DSD世代とDreamOSの実装目標(2026-08-08、ユーザー指示)**: DSDは
+  サンプリングレート倍数で世代が分かれる(DSD64=SACD相当の
+  2.8224MHz、DSD128、**DSD256=11.2896MHz**、DSD512=22.5792MHz)。
+  ユーザー指示により、**2026年8月8日時点でDreamOSが前提とすべき品質は
+  DSD256**とする。**2027年以降はDSD512が主流化する可能性を見込み、
+  ハードウェア設計・実装の向上に向けた将来情報として考慮しておく**
+  こと。
+  **正直な裏取り(2026-08-08 Web検索)**: DSD512は2027年以降の未来
+  技術ではなく、**2026年8月時点で既に一部の高級DAC実機に実在する**
+  (例: FiiO K9 Pro ESS、Chord Qutest、HIFI WALKER H20 Ultra〈FPGA
+  段によるDoPではないネイティブDSD対応〉)——ただし「対応音源
+  (レコーディング)自体が非常に少なく、ネイティブ再生対応システムも
+  ごく一部」という位置づけのニッチな最先端であり、一般的な普及水準
+  ではDSD256が現実的な標準という認識は妥当
+  ([hifiwalker.com](https://hifiwalker.com/blogs/dap-guides-tips/dsd256-vs-pcm-32bit-384khz-2026-h2-mini-audio-format-guide-for-audiophiles)、
+  [aumoz.com](https://aumoz.com/best-dacs-of-2026/))。DreamOS側の
+  実装計画としては、**DSD256をソフトウェアデコードパイプラインの
+  当面の目標解像度とし、DSD512は「将来ハードウェア(DAC/DSP)側の
+  対応が広がった際に同じ抽象化層で拡張できる」設計上の伸びしろとして
+  最初から想定しておく**(具体的には、DSDのサンプルレート・
+  ビット深度をハードコードせず、対応レート一覧をデータとして持つ
+  設計にする、という程度の指針——今回は方針の記録のみ、実装は次回
+  以降)。
+- **SACD(Super Audio CD)/ Blu-ray Audioクオリティ実装**: SACDは
+  サンプリングレート2.8224MHz・1bit解像度のDSD(Direct Stream
+  Digital、PDM方式)で符号化され、ステレオで非圧縮5.6Mbps
+  (CD音質の4倍)([TREBLAB](https://treblab.com/blogs/news/what-is-sacd)、
+  [Wikipedia](https://en.wikipedia.org/wiki/Super_Audio_CD))。
+  対する「Pure Audio Blu-ray」は24bit/192kHz PCMまたはロスレス
+  マルチチャンネルコーデック・25GB超の大容量に対応するが、対応
+  ソフト・専用プレーヤーの普及はSACDより少ないニッチ規格
+  ([Magnetar Audio](https://www.magnetarusa.com/blogs/latest_blogs/the-ultimate-guide-to-music-on-disc-sacd-dvd-audio-cd-blu-ray-audio-dsd))。
+  **DreamOS側の実装方針として妥当と考えられる範囲**: 物理ディスクの
+  読み取り自体(SACD独自の暗号化・著作権保護機構)はハードウェア
+  ライセンスが絡むため対象外とし、**「SACD/Blu-ray Audio相当の
+  ビットレート・解像度(DSD64/128、24bit/192kHz PCM)をソフトウェア
+  再生パイプラインとして扱えること」**を目標に据えるのが現実的
+  (上記DSD項目の「DoP方式でのソフトウェアデコード」と同じ扱い)。
+- **ステレオ(STEREO)**: 上記いずれの空間音響フォーマットも、
+  非対応環境への**ステレオ/5.1へのダウンミックス**を前提とした設計が
+  業界標準——DreamOS側の空間音響抽象化層も、必ずステレオへの
+  フォールバック経路を持つ設計とすること。
+- **IMAX 12チャンネル音響**: 12個の独立チャンネル+サブベース、
+  低域再生は23Hzまで(体感振動としては12Hzまで)対応する広帯域
+  設計([Display Daily](https://displaydaily.com/29imax-reveals-new-12-track-audio-solution/)、
+  [hifi.fan](https://hifi.fan/imax-12-channel-audio))。
+- **4DXモーション技術**: 7.1/9.1サラウンドに、モーターシートの
+  傾き・振動・風・水・霧等の環境演出を映像に同期させる方式
+  ([Syntec Optics](https://server.syntecoptics.com/old/4dx-vs-imax-which-immersive-cinema-technology-delivers-the-ultimate-sensory-experience))——これはOS/GPU実装というより外部アクチュエータ制御
+  API(SDK)の領域であり、DreamOS本体というよりは周辺機器連携
+  (今回のスコープ外)として切り分けるのが妥当。
+- **GPU実装レベル(実在する裏付け)**: [GPU Audio](https://www.gpu.audio/)
+  社が2025年に低遅延GPUオーディオDSP SDK(Processor
+  API・DSP API・DSPコンポーネントライブラリ)を実際にリリース済み
+  ([sonicstate.com](https://sonicstate.com/news/2025/03/18/gpu-audio-sdk-released-/))——
+  「GPU実装レベルの音響処理」自体は既に実在する業界動向であり、
+  荒唐無稽な提案ではないことを確認できた。DreamOS側で採用する場合、
+  `open-cuda`(Vulkan計算基盤)の再利用が技術的に筋が良いと考えられる
+  (今回は調査のみ、実装は次回以降)。
+- **OS/DirectXレベル**: Windowsの実在するAPIは`Spatial Sound`
+  (Windows Sonic for Headphones、Dolby Atmos for Home Theater、
+  DTS:Xのいずれかをバックエンドとして選択可能)であり、Win32/UWP/
+  Xbox/HoloLens 2向けに提供されている
+  ([Microsoft Learn](https://learn.microsoft.com/en-us/windows/win32/coreaudio/spatial-sound))。
+  **正直な訂正**: フック先はDirect3D(グラフィックスAPI)ではなく
+  Windows Core Audio APIs(`XAudio2`/`Spatial Sound`)であり、
+  「DirectX対応」という表現は正確には「Windows Core Audio API対応」
+  と言い換えるのが技術的に正確——DreamOSの提案文書でもこの区別を
+  明記すること。
+- **NPU実装レベル(未検証・裏付け不十分)**: AIノイズ抑制・
+  アップミックス等にNPUを使う製品(Windows Studio Effects等)は
+  実在するが、今回の検索では「NPUによる空間音響処理」に特化した
+  確立された標準・SDKは見つからなかった——**現時点では未検証の
+  将来領域として正直に保留**し、確立されたSDKが登場した段階で
+  再調査すること。
+
+**結論(現時点での提案の位置づけ)**: 上記は調査に基づく妥当性のある
+方向性だが、DreamOS自体がまだPoC段階(§「長期ビジョンの詳細化」参照)
+であるため、**今回のパスではコード実装は行わない**——上記「長期
+ビジョン」と同じ「野心・提案段階」の文書化に留める。
+- 次にすべきこと: (1) `open-cuda`のVulkan基盤上でGPU Audioの
+  ProcessorAPI相当の最小PoC(例: 単純なHRTF畳み込みのGPUオフロード)を
+  検討、(2) Windows Core Audio APIs(`Spatial Sound`)とDreamOSの
+  抽象化層の対応関係を設計、(3) DSD(DoP方式)のソフトウェアデコード
+  実現可能性を追加調査。
+
+## VPS/ローカルとの対応(2026-08-06新設)
+
+- ローカル: `F:\runo\dream-os`(このclone)。
+- VPS(conoha): `/root/dream-os`(新設予定、[`PORTING.md`](PORTING.md)参照)。
+
+## スコープの絞り込み(2026-08-06、ユーザー指示による現実路線への転換)
+
+ユーザー指示: 「現状では、GT730のWindows PCとAndroidスマホ数台しか
+なく、メーカーのライセンスが必要な物は、将来解決する前提で将来許可を
+もらう前提で今は、出来る事から始めて行きましょう!」
+
+**現時点で実際に持っている実機・実権限に基づいたスコープ**:
+
+- **今すぐ着手できる対象(実機あり)**: **Windows**(NVIDIA GT730搭載PC、
+  `open-directx`/`open-cuda`が既にこの実機で実機検証を積んでいる)・
+  **Android**(スマホ数台、`open-web-server`/`open-easy-web`のAndroid版で
+  既にAPK配布・実機検証の実績あり)。
+- **将来、ライセンス/許諾が取得できてから着手する対象(現時点では
+  実機・SDK・開発者ライセンス無し)**: macOS/iPhone(Apple Developer
+  Program、iOS側はさらに「非公式ハードウェアでのネイティブ実行は技術的に
+  不可能」という上記調査結果の制約も残る)、SONY PlayStation 5/6
+  (公式開発機材・NDA)、Nintendo Switch 2(公式開発機材・NDA)。
+  これらは**「将来許諾を得られたら着手する」という前提つきの保留**であり、
+  スコープから完全に外すわけではない。
+- Linux×TRONハイブリッドカーネルという最終ビジョン自体は変更しないが、
+  **最初のPoC(概念実証)は「Windows実機+Android実機」の2プラット
+  フォームに限定**し、実際に動くものを積み上げてから次のプラット
+  フォームへ拡張する方針とする(上記調査結果で確認した通り、Android
+  はLinuxカーネルベースのため技術的難度が比較的低く、最初の一歩として
+  現実的)。
+
+- 次にすべきこと: (1) Windows PCの実機(GT730)を使い、既存の
+  `open-directx`(DirectXシェーダー→Vulkan翻訳)・`open-cuda`
+  (Vulkan計算基盤)を土台に、DreamOSの「共通実行基盤」としての
+  再利用可能性を具体的に検証する、(2) Android側は`open-web-server`/
+  `open-easy-web`のAndroid実装(`cargo ndk`クロスビルド、実機検証済み)を
+  参考に、DreamOS用の最小Android連携PoCを検討する、(3) 上記2つが
+  実際に「同じ実行基盤の上で」動くところまで確認できて初めて、
+  「ハイブリッドカーネル」という中核テーマへ着手する土台ができたと
+  言える——現時点ではまだその手前の段階であることを正直に記録しておく。
+
+## World Laboratory構想の本格設計(2026-08-06、[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)新設)
+
+ユーザー指示「C(World Laboratory構想の本格設計)とD(一旦区切って
+open-directx優先に戻る)を集中して」への対応。[`docs/world-laboratory-
+design.md`](docs/world-laboratory-design.md)を新設し、BOINC/Folding@home/
+Golem Network/Petalsという実在の先行事例から教訓を抽出した3層アーキ
+テクチャ案(コーディネータ層=RPoem/open-web-server再利用、ワーカー層=
+`dream-os-kernel`拡張、実行基盤層=既存opencuda-vulkan)、ワークユニット
+設計、N-of-M多数決による結果検証(既存の`open-web-server-ledger::
+MultiRegionReplicator`と同じパターンの転用可能性)、Sybil耐性の課題、
+フェーズ0〜4の段階的ロードマップを記載。**今回は設計文書のみ、実装は
+一切行っていない**。
+- 次にすべきこと: フェーズ1(信頼できるノード群内でのコーディネータ↔
+  ワーカー間の最小実装)へ着手するかどうかは、open-directxの完成度向上が
+  優先方針のため、次回以降ユーザーと相談の上で判断する。
+
+## マイニング相当の実ハッシュ計算カーネル+Android実機検証(2026-08-06)
+
+ユーザー指示「マイニング相当の実ハッシュ計算カーネル追加、または
+Android実機検証の両方を同時に進めて実際にグラフィックボードでマイニング
+も可能にして」への対応。
+
+**実装**: `crates/dream-os-kernel/src/mining.rs`(新規)+
+`shaders/sha256d_mine.comp`(新規)——32バイト固定長メッセージに対する
+double-SHA256(Bitcoin等のPoWで実際に使われる構成)を実Vulkanデバイス上で
+バッチディスパッチする`MiningWorker`。**`open-cuda`側にも小さな変更を
+加えた**: `opencuda-vulkan::VulkanDevice::launch_kernel`はカーネル名の
+ホワイトリスト方式(`vector_add`/`matmul`/`raid6_*`/`softmax`のみ)だった
+ため、`sha256d_mine`カーネルを同じ設計パターン(`ensure_*_args`+
+`run_*_spirv`+`dispatch_spirv`共有経路)で追加した
+(`open-cuda/crates/opencuda-vulkan/src/real.rs`、`cargo build -p
+opencuda-vulkan --features real-vulkan --release`で警告0件を確認)。
+
+**実機検証(Windows、NVIDIA GeForce GT 730)**: `tests/mining_real_vulkan.rs`
+——GPU計算した64個のdouble-SHA256ダイジェストが、RustCrypto製`sha2`
+クレートによるCPU参照実装と完全一致することを実証(`cargo test --release
+--test mining_real_vulkan`)。**実装過程で見つけた実バグ**: 当初CPU参照側の
+メッセージバイト順を`to_le_bytes()`で組み立てていたため不一致になった
+——シェーダ側は`m0..m7`をそのままSHA-256のビッグエンディアンメッセージ
+ワードとして使う設計のため、CPU参照側も`to_be_bytes()`で組み立てる必要が
+あった(修正後、64件全て一致)。`examples/mine_benchmark.rs`でハッシュ
+レート計測(このマシンで約0.4〜0.53 MH/s)も実測。
+
+**実機検証(Android、Moto G53Y 5G実機、`adb`接続確認済みの実デバイス)**:
+`cargo ndk -t aarch64-linux-android build --example mine_benchmark
+--release`でクロスビルドし、`adb push`(**正直な開示・ハマった点**:
+Git Bash〈MSYS〉から`adb.exe`〈ネイティブWindows実行ファイル〉へUnix風の
+絶対パスを渡すと、MSYSの自動パス変換が誤動作し`push`が壊れたファイルを
+転送する事象に遭遇——`PowerShell`ツール経由での`adb push`に切り替えて
+解決した。次回同様の作業をする際はBashではなくPowerShellから`adb`を
+呼ぶこと)で実機へ配置、実際に実行した:
+- **実際に`OpenCUDA Vulkan Device (Adreno (TM) 619)`という実GPU名で
+  デバイスが開けた**——`open-cuda`側の2026-07-25監査(クロスコンパイル
+  成功のみ確認、実機実行は未検証)を今回のPoCで一歩進め、**Android実機
+  での`vkCreateInstance`成功・実ディスパッチ成功を初めて実証した**。
+- 1バッチ目(1,048,576ハッシュ)は実際に成功し完了(0.48 MH/s、Windows
+  GT730とほぼ同等の実測値)。
+- **2バッチ目で`vkQueueSubmit failed: The logical device has been
+  lost`(実ドライバのTDR〈Timeout Detection and Recovery〉相当のエラー)
+  が発生**——正直に記録する実際の発見。モバイルGPUドライバは長時間の
+  単一コンピュートディスパッチに対して、デスクトップGPUより厳しい
+  タイムアウト制約を持つことが知られており、大きなバッチサイズ
+  (`DEFAULT_BATCH_SIZE=1048576`)を1回のディスパッチにまとめる現在の
+  設計はAndroid実機では2回目以降に不安定になることが実機で確認できた。
+  **次回の課題**として、バッチサイズを小さく分割してディスパッチする
+  (またはタイムスライシング)設計への変更が必要。
+
+## open-directx連携+aruaru-db永続化を実装(2026-08-06)
+
+ユーザー指示「dream-osをopen-directx・open-cuda・open-web-server・RPoem・
+open-raid-z・aruaru-dbなどをベースに関連技術を実装開発、完成度と連携性の
+向上をして」への対応。2つの具体的な実機検証済みブリッジを実装した。
+
+### open-directx連携(`crates/dream-os-kernel/src/directx_bridge.rs`)
+
+`open-directx`(`directx-shader-translate`、path依存で再利用)のDXBC
+(Windows専用D3D11 Compute Shaderバイトコード、`fxc.exe`実コンパイル済み)
+→SPIR-V翻訳を、dream-os-kernelのVulkan実行基盤へ直接接続した。
+**「Windows専用DirectXコンピュートシェーダーバイナリが、DreamOSの
+Windows/Android共通Vulkan実行層でそのまま動く」ことを実証**——
+open-directx・open-cuda・dream-osの3リポジトリの連携性を具体的な
+コードで示す最初の実装。
+
+**実機検証(NVIDIA GT730)**: `tests/directx_bridge_real_vulkan.rs`——
+open-directx側の実`vector_add.dxbc`(`include_bytes!`で直接取り込み)を
+翻訳・ディスパッチし、256要素すべてCPU参照実装と一致することを確認。
+
+### aruaru-db永続化(`crates/dream-os-wire/src/aruaru_persistence.rs`)
+
+World Laboratory構想([world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md))の通信・永続化層
+(第4層)のうち、これまで「実DBインスタンスが無いため未配線」としていた
+永続化部分を、`aruaru-db`(ACID互換+Git-on-SQLバージョン管理)へ実際に
+接続する形で実装した。`tokio-postgres`で`aruaru-server`(pgwire)へ
+接続し、`WorkResultEnvelope`をINSERT+`aruaru_commit`でコミット、
+バージョン管理されたcommit_idを取得する。
+
+**実機検証**: 実際に`aruaru-server`(既存ビルド済みバイナリ、
+`ARUARU_USERS`環境変数で認証情報設定)をローカルで起動し、
+`tests/aruaru_db_integration.rs`で実接続・INSERT・`aruaru_commit`まで
+一気通貫で検証(`commit_id=95932e6f...`を実際に取得)。
+
+**実機検証で発見した実際の制約(正直な開示)**: `aruaru-query`のSQL
+パーサーは`INSERT ... VALUES(...)`内の値をクォートを考慮しない単純な
+`split(',')`で分割する簡易実装(意図的に絞り込まれたサブセット)。
+そのため`result_json`(JSON文字列)にカンマが含まれると
+`"INSERT: N columns but M values"`エラーになることを実際の接続で
+発見・特定した。dream-os側でBase64エンコードしてから格納する回避策を
+実装(aruaru-db側のパーサー自体は変更していない——影響範囲の広い
+コア変更を避け、呼び出し側での回避を選択)。
+
+**正直な開示・未実装**: (a) `open-web-server`/RPoemとの直接連携(HTTPコ
+ーディネータとしての実配線)は今回未着手——World Laboratory設計文書の
+「フェーズ1」相当。(b) `open-raid-z`との直接連携は、aruaru-db自体が
+既にopen-raid-zとのZFS互換スナップショット連携を持つため
+(`aruaru-dist::raid_z_backend`)、間接的に活用可能だが今回新規のコードは
+書いていない。(c) `aruaru-llm`との連携は今回未着手。
+
+**検証**: `cargo build --workspace --release`/`cargo test --workspace
+--release`で全クレートregression無し。
+
+- 次にすべきこと: (1) World Laboratoryコーディネータ本体(RPoem/
+  open-web-server上への実HTTP API)の実装、(2) aruaru-llmとの連携
+  (World Laboratoryのワークロード種別としてLLM推論タスクを追加)、
+  (3) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
+## 東芝SBM・DeepSeek・IOWNの調査+東芝SBM(量子アニーリング風最適化)の実装(2026-08-06)
+
+ユーザー指示「東芝の擬似的な量子コンピューター技術で富士通より普通の
+グラフィックボード一枚のPCの方が100倍高性能…DeepSeekのグラフィック
+ボード数千枚のシステムをグラフィックボード一枚のPCに凝縮、圧縮する
+折りたたみ技術や4層通信構成通信にIOWNの通信技術を…調査して、取り込んで」
+への対応。日英でGoogle/GitHub再調査を実施。
+
+### 1. 東芝SBM(Simulated Bifurcation Machine) — 実在・実装した
+
+2026年4月、東芝は前世代比10〜100倍高速化の新アルゴリズムを発表、
+16GPU構成で100万変数問題を約30分(CPU版シミュレーテッドアニーリングの
+約20,000倍高速)で解いたと報告([東芝公式](https://digitalpr.jp/r/44929)、
+[EE Times Japan](https://eetimes.itmedia.co.jp/ee/articles/2604/09/news036.html)、
+[IEEE Spectrum](https://spectrum.ieee.org/toshiba--optimization-algorithm-speed-record-combinatorial-problems))。
+富士通デジタルアニーラは専用ASICで超高速だが変数数8,192までの制約があり、
+東芝SBMはGPU上で10万変数以上の大規模問題に対応できる——「グラフィック
+ボード1枚が専用ASICに対して優位性を持ちうる」という報道の技術的背景を
+確認できた(ただし比較条件〈問題規模・世代〉に強く依存する点は要注意)。
+
+**実装**: SBMの核心アルゴリズムであるballistic Simulated Bifurcation
+(bSB、Goto et al. 2019)を`shaders/sbm_ising.comp`(新規)として実際に
+Vulkan Compute上へ実装した(64スピンのIsing模型、1ワークグループ内の
+共有メモリでx/y状態を保持し`barrier()`で同期しながら時間発展)。
+open-cuda側にも`sbm_ising`カーネルのディスパッチ経路を追加(既存の
+`ensure_*_args`/`run_*_spirv`パターンを踏襲)。`crates/dream-os-kernel/
+src/sbm.rs`(新規)にGPU実行関数+CPU参照実装(全く同じ更新式の逐次計算)
+を実装。
+
+**実機検証(NVIDIA GT730)**: `tests/sbm_real_vulkan.rs`——64スピンの
+ランダムIsing問題(決定的な擬似乱数で生成)を解き、**GPU版とCPU参照
+実装が完全に同一のスピン配置(64/64一致)へ収束すること**を確認
+(`cargo test --release --test sbm_real_vulkan`)。`cargo test --workspace
+--release`で全クレートregression無し。
+
+**正直な開示**: 「100倍高性能」を主張するものではない——今回のPoCは
+64スピンの小規模問題を解く最小実装であり、東芝の商用実装(SQBM+、
+離散化アルゴリズムdSB・FPGA対応・100万変数規模)との性能比較は
+行っていない。詳細・出典は`crates/dream-os-kernel/src/sbm.rs`の
+モジュールdoc参照。
+
+### 2. DeepSeekの「数千枚のGPUを1枚に凝縮・圧縮する折りたたみ技術」— 調査の結果、そのような技術は確認できなかった(正直な訂正)
+
+日英で再調査したが、**「数千枚のGPUのシステムを1枚のGPUへ物理的/
+論理的に折りたたむ・凝縮する技術」という報道・技術文書は見つからなかった**。
+実際にDeepSeek関連で確認できたのは以下——性質の異なる話であることを
+正直に整理する:
+
+- DeepSeekの公式発表では、V3モデルの学習に2,048台のNVIDIA H800 GPU・
+  278万GPU時間・推定580万ドルを要したとされる([BytePlus](https://www.byteplus.com/en/topic/409182))。
+- 一方、SemiAnalysis等の独立系分析では、実際には最大5万台規模のGPU
+  (16億ドル相当のインフラ投資)を保有しているとの指摘もあり、公式発表と
+  実態には論争がある([Tom's Hardware](https://www.tomshardware.com/tech-industry/artificial-intelligence/deepseek-might-not-be-as-disruptive-as-claimed-firm-reportedly-has-50-000-nvidia-gpus-and-spent-usd1-6-billion-on-buildouts))。
+  いずれにせよ「数千枚を1枚に圧縮した」という主張ではない。
+- DeepSeekが実際に開発した効率化技術は**MLA(Multi-Head Latent
+  Attention)**——推論時のKVキャッシュのメモリ使用量を圧縮する
+  アーキテクチャ上の工夫であり、「物理的なGPUの台数を減らす」ものでは
+  なく「1台あたりのメモリ効率を上げる」技術。この方向性自体は
+  `open-cuda`が既に持つINT4/INT8/AWQ量子化(`opencuda-blas`、
+  実装・検証済み)と概念的に同じ系統(メモリ効率化によるハードウェア
+  要求の軽減)であり、**DreamOSとして新たに追加実装すべき固有の技術は
+  見つからなかった**——既存のopen-cuda量子化機能がこの方向性の実装と
+  して既に存在する、という結論とする。
+- 次にすべきこと: 特になし(調査の結果、実装対象と呼べる具体的な技術が
+  見つからなかったため)。もしユーザーが指す情報源(特定の記事URL等)が
+  あれば、それを教えていただければ再調査する。
+
+### 3. IOWN(NTTのオールフォトニクスネットワーク) — 物理インフラのため直接実装は不可、既存のRS-SmartTCP設計を再確認
+
+IOWN/APN(オールフォトニクス・ネットワーク)は、NTTが構築する光ベースの
+物理通信インフラであり、2023年3月にIOWN 1.0(100Gbps専用線サービス)が
+提供開始されている([NTT Group](https://group.ntt/jp/group/iown/function/apn.html))。
+GitHub上の実装や、ソフトウェアとして再現可能な技術ではない
+(物理層の光ネットワーク設備そのもの)。
+
+**このエコシステムでの既存の扱い**(`open-web-server`側で既に調査・
+実装済み、今回新たに確認): `RS-SmartTCP`が「IOWN/APNのような超低
+遅延・ジッター無し回線を検知した際にリトライ間隔等を積極化する適応
+制御」として、IOWN自体ではなくIOWNが実現する回線特性に**適応する
+ソフトウェア側の設計**を既に持っている(RTT/ジッター推定を
+RFC 6298/RFC 9002と同じSRTT/RTTVAR方式で行う)。dream-os-wireの
+将来の4重伝送路対応(今回未実装)でも、この既存のRS-SmartTCP設計を
+再利用する方針を[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)へ追記した——
+IOWN自体を「実装」することはできないが、IOWNのような低遅延回線が
+将来利用可能になった際に自動的に活かせる適応制御という形で、
+間接的に「取り込む」ことは可能という結論。
+- 次にすべきこと: 実際にdream-os-wireへ複数伝送路対応を実装する際
+  (World Laboratory設計文書フェーズ2以降)、RS-SmartTCPをpath依存で
+  再利用する。
+
+### IOWN仕様の追記更新(2026-08-08、ユーザー提供情報での再確認)
+
+上記2026-08-06調査の結論(IOWNは物理インフラのため直接実装不可、
+RS-SmartTCPが適応制御として間接的に取り込む方針)は変更しないが、
+ユーザーから提供された最新情報で数値目標・構成要素をより正確に記録
+しておく。
+
+- **正式名称**: Innovative Optical and Wireless Network
+  ([NTT Group](https://group.ntt/jp/group/iown/whats.html))。
+- **目標性能(3点)**: 電力効率**100倍**・伝送容量**125倍**・
+  遅延**1/200**
+  ([NTTデータ](https://www.nttdata.com/jp/ja/trends/data-insight/2025/0403/))。
+  ——dream-os-wireの将来設計で「IOWN級の回線が使えた場合、どこまで
+  積極的な適応制御が可能か」の目安値として記録。
+- **3つの構成要素**: ①APN(オールフォトニクス・ネットワーク、
+  端末まで光のみで伝送)・②DTC(デジタル・ツイン・コンピューティング、
+  実世界とデジタル空間を掛け合わせた予測/シミュレーション)・
+  ③CF(コグニティブ・ファウンデーション、ICTリソースの最適制御)
+  ([Open Hub](https://openhub.ntt.com/journal/16100.html))——
+  RS-SmartTCPが直接関係するのは①APNの回線特性のみで、②DTC・
+  ③CFはdream-osの現在のスコープ外(将来World Laboratory構想〈分散
+  ボランティアコンピューティング〉と概念的に近い部分はあるが、今回は
+  関連性の指摘のみに留める)。
+- **実用化状況**: 2024年よりビジネス向け「APN専用線プラン」等の
+  商用サービス提供開始済み。2030年の本格普及を目標にIOWN Global
+  Forumで世界標準化の議論が進行中——**dream-osが実際にIOWN級回線の
+  恩恵を受けられる一般消費者向け普及時期はまだ先**という位置づけは
+  2026-08-06時点の結論と変わらない。
+
+### 「安価な端末+超低遅延通信=強力な遠隔インフラへの窓」という将来ロードマップ的枠組み(2026-08-08、ユーザー提案)
+
+ユーザー提案: 「IOWN級の通信が世界中で使えるようになれば、オンライン
+接続さえあれば安価なPC/タブレット/スマホでもClaude Code Desktopの
+ような構成(手元は薄いクライアント、実際の処理は強力な遠隔サーバー)に
+近い恩恵を受けられるはずで、これは将来のハードウェア進化(安価・
+高速・省電力な端末の登場)を見据えたロードマップとして妥当ではないか」
+という指摘があり、これは**技術的に妥当な将来像**と評価する。
+
+**妥当性の根拠**: これは既に実在するアーキテクチャパターン
+(クラウドゲーミング〈GeForce NOW等〉、Claude自体のクライアント/
+サーバー構成)の延長線上にある——手元のクライアントは薄いまま、
+実際の高負荷処理は遠隔の強力なインフラが担い、通信の低遅延・高帯域・
+高セキュリティが、この分離をユーザー体験上「ローカル実行と区別が
+つかない」レベルまで引き上げる。IOWN級の性能(遅延1/200・伝送容量
+125倍)が実現すれば、この構成が成立する用途がより広がるという見立ては
+妥当。
+
+**正直な区別(重要)**: これは「安価な端末自体が高性能になる」という
+話ではなく、**「安価な端末が、強力な遠隔インフラへの“窓”として機能する
+体験の質が、ローカル実行と区別がつかないレベルまで向上する」**という
+話である——この区別は、DreamOSの将来設計判断(何をローカル処理に
+残し、何をネットワーク越しの遠隔サーバーに委ねるかの線引き)に直接
+関わるため、混同しないよう正直に記録しておく。
+
+- 次にすべきこと: DreamOSの設計方針として、「ローカル実行前提の
+  抽象化層」と「低遅延遠隔インフラへ処理をオフロードする抽象化層」を
+  最初から分離しておき、将来IOWN級の回線が一般に普及した際に後者へ
+  段階的に処理を移せるようにしておく、という設計指針を検討する
+  (今回は方針の記録のみ、具体的な実装は次回以降)。
+
+## World Laboratory構想: 通信・永続化層(第4層)を3層から4層へ拡張・実装(2026-08-06)
+
+ユーザー指示「open-web-server・RPoem・open-raid-z・aruaru-dbのACID
+互換・ZFS互換の4層4重通信の技術もdream-osに実装、移植して」+
+「もう一度Google検索とGithub調査を日本語と英語でして」への対応。
+
+**再調査結果**: BOINC自体は暗号学的な改ざん検知・リプレイ対策を標準
+機構として持たず、「複製配布(同一ジョブを複数の無関係なPCへ)+多数決」
+が結果検証の主軸であることを確認([BOINC Wiki: SecurityIssues](https://github.com/BOINC/boinc/wiki/SecurityIssues))。
+一方、AEAD+シーケンス番号によるアンチリプレイ(ASN技術)は業界標準
+パターンと確認でき、これは`open-web-server-wire::SecureChannel`が既に
+実装している設計と完全に一致した。この裏付けを踏まえ、`docs/
+[world-lab/docs/world-laboratory-design.md](https://github.com/aon-co-jp/world-lab/blob/main/docs/world-laboratory-design.md)のアーキテクチャを3層から4層(コーディネータ/
+**通信・永続化層〈新設〉**/ワーカー/実行基盤)へ拡張。
+
+**実装(設計文書だけに留めず、実際にコードを書いて実機検証)**:
+新規`crates/dream-os-wire`(`open-web-server`〈path依存、
+`open-web-server-wire`のSecureChannel再利用〉+`open-web-server-core`)。
+`WorkResultEnvelope`+`WorkerChannel::submit()`/
+`CoordinatorChannel::receive()`という薄いラッパーで、ワーカー→
+コーディネータ間の計算結果送信をAEAD暗号化+リプレイ対策で保護する。
+`tests/secure_channel_integration.rs`(3件全green): (1) 正常送受信の
+往復一致、(2) **同一結果フレームのリプレイ拒否**(多数決の不正水増し
+攻撃を模擬)、(3) **改ざんされた結果フレームの拒否**(AEADタグ検証で
+復号自体が失敗、でっち上げた偽の計算結果を防ぐ)。`cargo build
+--workspace --release`/`cargo test --workspace --release`で全クレート
+regression無し。
+
+**正直な開示・実装しなかったもの**: (a) 4重伝送路(TCP/UDP/QUIC/MPTCP、
+`open-web-server-wire`に既存)は今回配線せずペイロード層のみ、(b) 4重DB
+永続化(PostgreSQL/aruaru-db/マルチリージョン同期/独立監査ログ、
+`open-web-server-ledger`)は実DBインスタンスが無いため配線せず設計方針
+記録のみ、(c) TLS終端・相互認証(第1層・第2層)は将来のコーディネータ
+実装側が担う想定で未検証。
+- 次にすべきこと: (1) コーディネータ本体(RPoem/open-web-server上への
+  実HTTP APIとしてのワークユニット配布・複製配布N-of-M実装)、
+  (2) `open-web-server-ledger`の実配線(実DBインスタンス確保後)、
+  (3) open-directxの完成度向上が優先方針のため、本格実装は次回以降。
+
+## A. Androidバッチ分割修正(2026-08-06、実機で`device lost`を解消)
+
+前節で発見した「Android実機で2バッチ目に`vkQueueSubmit failed: The
+logical device has been lost`」を修正した。`mining.rs`に
+`MOBILE_SUB_BATCH_SIZE`(16,384ハッシュ/ディスパッチ)+
+`MiningWorker::mine_batch_split()`(大きな`total_count`を
+`sub_batch_size`単位に分割して繰り返しディスパッチ、結果を結合)を
+追加。`examples/mine_benchmark.rs`は`cfg!(target_os = "android")`で
+Androidビルド時のみ自動的にサブバッチ分割を使うよう変更(デスクトップは
+従来通り`DEFAULT_BATCH_SIZE`を1回のディスパッチで使う、性能を落とさない)。
+
+**実機再検証(Android、Moto G53Y 5G、Adreno 619)**: `cargo ndk -t
+aarch64-linux-android build --example mine_benchmark --release`で
+クロスビルドし、`adb push`(PowerShell経由)で実機へ配置・実行。
+**3バッチ(合計3,145,728ハッシュ)すべて成功、`device lost`は再発しなかった**
+——修正前は2バッチ目で確実に失敗していたのに対し、明確な改善を実機で確認。
+**正直な開示**: スループットは約0.10 MH/s(修正前の1バッチ目実測
+0.48 MH/sより低下)——64回に分割したことでディスパッチ間オーバーヘッド
+(コマンドバッファ記録・`vkQueueSubmit`・`vkDeviceWaitIdle`の往復)が
+64倍になったのが原因。安定性のためのトレードオフとして正直に記録する
+(次回、サブバッチサイズのチューニング〈安定性を保ちつつ大きくできるか〉
+は再検討の余地がある)。
+
+## B. open-cuda複数GPU対応の修正(2026-08-06)
+
+`opencuda_vulkan::VulkanDevice::new(id)`の`id`引数が物理デバイス選択に
+使われていなかった実バグを修正(詳細は下記実装記録)。このマシンには
+GPUが1枚(NVIDIA GT730)のみのため、**2枚目以降のGPUを実際に選択できる
+ことの実機検証は不可能**——`id`が範囲外の場合に正しくエラーになること、
+`id=0`(唯一の実機構成)で従来通り動作することのみ実機検証済み。
+
+## 複数GPU・NPU・大規模スケール("1枚〜数千枚"・NPU複数・LLM同時稼働)について(正直な開示、未実装)
+
+ユーザーから「1枚から十数枚から数千枚の想定のグラフィックボードとあれば
+NPUも同時稼働可能で複数のNPUにも対応してマイニングやLLMも可能に」との
+指示があった。調査・設計検討の結果、以下を正直に記録する:
+
+1. **単一マシン内の複数GPU**: `opencuda_vulkan::VulkanDevice::new(id)`を
+   実際にソースコードで確認したところ、`id`引数は物理デバイス選択には
+   使われておらず、**常に「computeキューを持つ最初に見つかった物理
+   デバイス」を開く**設計だった(`open-cuda/crates/opencuda-vulkan/src/
+   real.rs`)。つまり現状、1台のマシンに複数のGPUがあっても2枚目以降を
+   明示的に選んで開く手段が無い——`open-cuda`側に物理デバイスインデックス
+   指定機能を追加する必要がある**既知のギャップ**(`mining.rs`の
+   モジュールdocに明記済み)。このマシンにはGT730が1枚のみのため、
+   複数GPUでの実機検証はそもそも不可能。
+2. **NPU対応**: `opencuda-vulkan`はVulkan Compute専用設計であり、NPU
+   (ベンダー固有の推論アクセラレータAPI、例: Qualcomm Hexagon NPU
+   〈SNPE/QNN〉・Apple Neural Engine・Intel NPU等)は全く別のAPI体系
+   ——Vulkanでは触れない。NPU対応には、ベンダーごとの別バックエンド
+   クレートを新規に書く必要があり、今回は着手していない。
+3. **「数千枚」規模・LLM同時稼働**: 1台のマシンにGPUを数千枚搭載する
+   ことは現実的ではなく、実現するには**複数マシン(ノード)にまたがる
+   分散処理**(ネットワーク越しのタスク分配・結果集約プロトコル)が
+   必要になる——これは単一プロセスのVulkanディスパッチとは全く別の
+   レイヤーの設計であり、今回のPoCの範囲を大きく超える。下記
+   「World Laboratory構想」節で、この方向性についての調査結果を記録する。
+
+- 次にすべきこと: (1) Android実機での安定動作のためバッチサイズ分割
+  設計、(2) `opencuda-vulkan`への物理デバイスインデックス指定機能の
+  追加(open-cuda側の変更、複数GPU実機が無いためこのエコシステムでの
+  検証は現状不可能)、(3) NPUバックエンドの新規設計(着手前に日英調査
+  必須)、(4) 下記World Laboratory構想の技術調査。
+
+## World Laboratory構想(分散ボランティアコンピューティング、2026-08-06、調査のみ・未実装)
+
+ユーザーの提案「世界中のインターネットに接続しているパソコンやタブレット
+やスマホなどでワールドラボラトリー構想として、個人レベルでは持てない
+研究所レベルや大学やメーカーレベルのAI開発環境を世界中で協力して、自宅の
+安価なPCとオンライン環境でもAI開発を手助けできる可能性」について、
+**今回はコードを書かず、実在する先行事例の調査のみ**を行った(規模が
+非常に大きい構想のため、着手前にまず現実的な先例を把握する)。
+
+**実在する先行事例(すべて実際に稼働してきた実績のあるボランティア
+コンピューティング/分散コンピューティングの枠組み)**:
+- **[BOINC](https://boinc.berkeley.edu/)**(UC Berkeley発、2002年〜):
+  SETI@home・Folding@home等で使われた、世界中の個人PCの余剰計算資源を
+  科学計算(創薬・気候変動・宇宙探査等)へ提供するボランティア
+  コンピューティングの標準基盤。**教訓**: 中央のタスクサーバーが
+  ワークユニットを分割配布し、クライアントが結果を返す方式。信頼性の
+  低い個人PCからの結果検証(複数クライアントへ同一タスクを配って結果を
+  突き合わせる等)が必須設計要素。
+- **[Folding@home](https://foldingathome.org/)**: タンパク質folding
+  シミュレーションのボランティア分散計算、GPU/CPU双方対応。COVID-19研究
+  でも実際に使われた実績あり。
+- 分散AI学習・推論に特化した近年のプロジェクトとしては、ブロックチェーン
+  ベースの分散GPU市場([Golem Network](https://www.golem.network/)等)や、
+  近年の分散LLM推論プロジェクト(Petals等、大規模モデルを複数の
+  ボランティアノードで分割推論する仕組み)も実在する。
+
+**正直な結論**: この構想自体は技術的に前例のある方向性であり、
+「不可能」ではない。しかし実現には(1)タスク分配・結果検証・信頼性の
+低いノードへの耐性を持つ分散システムの設計、(2)ネットワークプロトコル
+(現状の`dream-os-kernel`は単一プロセス内のVulkanディスパッチのみ)、
+(3)セキュリティ(悪意あるノードによる不正な計算結果の混入対策)、
+という単一マシンでのGPU/NPU活用とは全く異なるレイヤーの本格的な
+新規開発が必要であり、**今回のセッションでは調査・方向性の記録に留め、
+実装には着手していない**(現在のPoCの優先度・open-directx優先方針との
+兼ね合いもあり、次回以降に本格的な設計フェーズとして着手するかを
+ユーザーと相談する)。
+
+## メインフレーム(IBM z/OS系・AWS版)互換性の調査(2026-08-06)
+
+ユーザー指示「dream-osに、汎用機(メインフレーム)OSのIBMとその他の
+バージョンとAWS版のメインフレームなども取り込んで互換性を保って」への
+対応として日英調査を実施(詳細は上記「技術調査結果」2.5節参照)。
+要点: (1) 命令セットエミュレータ`Hercules`はOSSで実在・現行メンテナンス
+継続中——技術的に組み込み可能な要素。(2) しかし実際のz/OS実行には
+IBMからの正式ライセンスが必須で、現時点でこのエコシステムには無い。
+(3) 「AWS版メインフレーム」はOS互換レイヤーではなく
+AWS Mainframe Modernization/AWS Transform for mainframeという
+**アプリケーション移行支援サービス**であり、DreamOSが目指す
+OSレベル互換性とは対象レイヤーが異なると判明。よってIBMメインフレーム
+互換は「フェーズ2以降(将来のライセンス取得を前提とした保留)」の
+プラットフォームロードマップへ7番目として追加した(macOS/iPhone・
+PS5/6・Switch2と同じ扱い)。コード変更は今回無し(調査・文書化のみ)。
+- 次にすべきこと: 実IBMライセンス取得の目処が立った場合、Hercules
+  (OSS命令セットエミュレータ)をどう組み込むかの技術検討に着手する。
+  それまでは他の保留プラットフォームと同様、優先度は低いまま維持する。
+
+## PoC実装(2026-08-06、初のコード着手)
+
+ユーザー指示「グラフィックボードなどの電力出力調整も可能なマイニングOS
+も取り込んで」+「PoC設計・コード着手して下さい」への対応として、初めて
+コードを書いた。**新規`crates/dream-os-kernel`**(Cargoワークスペース、
+`Cargo.toml`をルートに新設):
+
+1. **`src/lib.rs`**: `open-cuda`の`opencuda-vulkan`(既に実機Windows
+   GT730・Android `aarch64-linux-android`クロスコンパイル実績のある
+   Vulkan Computeバックエンド)をpath依存で再利用し、`open_device()`・
+   `dispatch_vector_add_once()`という薄いラッパーを提供。「ゼロから
+   独自カーネルを書く」のではなく「実績のある既存クロスプラットフォーム
+   基盤を、DreamOSの共通実行層として組み立て直す」というChromeOS/
+   crosvm型のアプローチを踏襲(CLAUDE.md技術調査結果の結論通り)。
+2. **`src/power_profile.rs`**: グラフィックボード等の電力出力調整が
+   可能なマイニングOS向けの`MiningPowerProfile`(0〜100%の
+   `power_percent`)。**正直な開示**: `nvidia-smi -pl`のようなハード
+   ウェアレベルの電力制限APIではなく(ベンダー固有APIに依存しない
+   クロスプラットフォーム設計のため)、ディスパッチ間に休止を挟む
+   **ソフトウェア側のデューティサイクル制御**で実効稼働率を調整する
+   方式。単体テスト5件(0%=停止・100%=休止無し・50%/10%での期待休止
+   時間・100超のクランプ)。
+3. **`examples/dispatch_throttled.rs`+`shaders/vector_add.comp`**:
+   `glslc`でコンパイルしたSPIR-Vを実Vulkanデバイスへ複数回ディスパッチし、
+   `MiningPowerProfile`で実効稼働率を落とせることを実測する検証プログラム。
+
+**実機検証(型チェックのみで完了と報告しない、エコシステム既存ルール
+徹底)**: `cargo test --release`(5件全green)、
+`cargo run --example dispatch_throttled --release -- 50 5`を実際に
+Windows実機(NVIDIA GeForce GT 730)で実行し、`vector_add`の計算結果が
+正しいこと(誤差チェック内蔵)、電力出力50%指定で実効デューティサイクル
+約43.2%(目標50%に近い値、休止時間の粒度による誤差)を実測確認。
+Android向けは`ANDROID_NDK_HOME`(27.1.12297006)を設定した上で
+`cargo ndk -t aarch64-linux-android build --lib`を実行し、実際に
+`aarch64`向けの`.rlib`が生成されることを確認(`opencuda-vulkan`・
+`opencuda-core`・`opencuda-ir`を含め全クレートがクロスビルド成功)。
+
+**正直な開示・未検証事項**: (1) Android実機での実行(実際にVulkan
+デバイスを開けるか、`vkCreateInstance`が成功するか)は未検証——
+`open-cuda`側の2026-07-25監査と同じく「クロスコンパイル成功」の段階に
+留まる、実機/エミュレータでの動作確認は次回課題。(2) この`dispatch_
+throttled`例はコンピュートシェーダ1本(`vector_add`)のみで、実際の
+マイニングアルゴリズム(SHA256等のハッシュ計算カーネル)は未実装——
+今回は「電力出力調整の仕組み」の実証に絞った。(3)
+`nvidia-smi`相当のハードウェア電力制限APIとの連携(より正確な電力
+制御)は将来の課題として`power_profile.rs`のdocに明記済み。
+
+- 次にすべきこと: (1) 実際のマイニング相当のGPU計算カーネル
+  (ハッシュ計算等)を`dream-os-kernel`に追加する、(2) Android実機/
+  エミュレータでの実行検証、(3) open-directxの完成度向上が優先方針の
+  ため、本格的な機能拡張よりもopen-directx側の進捗を待ちつつ小さく
+  育てる方針を継続する。
+
+## HANDOFF(直近の作業ログ、上が最新)
+
+- **2026-08-20 `aruaru_persistence.rs`の誤ったdocコメントを修正
+  (「`aruaru-server`は既定で認証を要求しない開発用構成」は誤り)**:
+  前セッションの実機検証(`aruaru-db`側`aruaru-wire::auth`の実装確認)で、
+  `aruaru-wire`は常にSCRAM-SHA-256の`AruaruStartupHandler`
+  (`SASLScramAuthStartupHandler`)を使う設計であり、認証をスキップする
+  経路自体が存在しないことが判明していた。`ARUARU_USERS`環境変数が
+  未設定でも「認証不要」にはならず、`AruaruAuthSource::from_env`が
+  ユーザーストアを空のまま構築するため「登録ユーザー0件で全SCRAMログイン
+  拒否」になる(`aruaru-db/crates/aruaru-wire/src/auth.rs`の
+  `from_env`/`get_password`で確認)。
+  1. `crates/dream-os-wire/src/aruaru_persistence.rs`のモジュールdoc・
+     `AruaruDbStore::connect`のdocコメント2箇所を、実際の挙動(常時
+     SCRAM-SHA-256認証、`ARUARU_USERS`で事前登録したユーザー名・
+     パスワードが接続に必須)へ書き換えた。
+  2. `grep -rn "認証を要求しない\|認証無し\|認証なし\|認証不要\|既定で認証"`
+     で本リポジトリ内(`.rs`/`.md`)を全件確認したが、他に同種の誤った
+     前提を書いている箇所は見つからなかった(今回修正した2箇所のみが
+     ヒット)。
+  3. **検証**: `cargo build --release -p dream-os-wire`成功(警告0件)。
+  - 次にすべきこと: 特に緊急の課題は無し。`AruaruDbStore`を実際に呼ぶ
+    側(World Laboratoryコーディネータ等)を実装する際は、接続先
+    `aruaru-server`起動時の`ARUARU_USERS`設定と一致する`user`/
+    `password`を`conn_str`に渡す必要がある点を忘れないこと。
+
+- **2026-08-12 `sbm_ising`が解ける具体的な組合せ最適化問題を新規実装
+  (`crates/dream-os-kernel/src/task_scheduler.rs`)——`sbm.rs`自身の
+  モジュールdoc・過去複数のHANDOFFで繰り返し「次にすべきこと」として
+  残っていた「sbm_isingが解ける組合せ最適化問題の具体候補を特定して
+  から着手する」への対応。ユーザー指示「open-english・open-easy-web・
+  open-web-server・open-directx・open-cuda・aruaru-llm・RPoem・
+  open-raid-z・aruaru-db・PostgreSQL・複数WAN/複数LANのリポジトリの
+  設計思想をdream-osに活かす試作品を開発・TESTを繰り返して」への対応**:
+  1. **具体候補**: `RS-SmartTCP::path_optimizer`(複数WAN/LAN経路選択、
+     QUBO→Ising変換によるナップサック問題の求解、実機検証済み)・
+     `aruaru-llm::cache_optimizer`(モデルキャッシュ容量予算問題)と
+     同型の0/1ナップサック定式化を、本クレート固有の意思決定
+     ——「`power_profile::MiningPowerProfile`と同じ電力/ディスパッチ
+     予算の下で、複数の保留中GPU計算タスクのうちどれを今サイクルで
+     実行するかを選ぶ」——へ適用した(コードのコピーではなく独立実装、
+     各リポジトリが互いにpath依存しない既存方針を踏襲)。
+  2. **実装中に発見・修正した2つの数学的な罠(正直な開示、両方とも
+     コードレビュー段階の自己発見・実機検証で確定)**:
+     - **h項(局所磁場)の欠落**: `sbm.rs`のGPU/CPU実装は結合項
+       `J_ij*s_i*s_j`(MaxCut風)のみで、QUBO→Ising変換が本来必要とする
+       局所磁場`h_i*s_i`を渡す引数がそもそも存在しない。単純にhを
+       ゼロパディングするだけでは数学的に誤った問題を解いてしまう
+       ——**補助スピン(ancilla)による標準的な埋め込み**
+       (`h_i*s_i`を`h_i*s_i*s_a`という通常の結合項として埋め込み、
+       解読時は補助スピンとの相対符号`s_i^recovered = s_i*s_a`を取る)
+       で解決した(数式的な裏付けはモジュールdoc内に記載)。
+     - **符号規約の不一致(実機テストで発覚)**: `to_ising`は標準規約
+       `E = sum h_i s_i + sum J_ij s_i s_j`の最小化を前提に導出したが、
+       `sbm.rs`の`ising_energy`/力学系は符号が反転した`E' = -sum
+       J'_ij s_i s_j`を最小化する規約だった。符号を合わせずに実行した
+       結果、実機テストで「8回の試行すべてで常に全5タスクを選択する」
+       という体系的な誤り(ランダムノイズではなく毎回同じ誤答、
+       予算120/60コスト超過)として発覚——`J' = -J`(h含む)を渡すことで
+       修正し、修正後は8回の試行全てが予算制約を満たし、実際に
+       ナップサック問題として機能することを確認した(修正前は
+       `used_sbm_solution=false`で毎回貪欲フォールバックに頼っていた
+       ——CPU単体テストは偶然貪欲解が最適値と一致したため「green」の
+       まま実際の不具合を隠していた、という「テスト成功≠実装正解」の
+       実例としても記録する)。
+  3. **本クレート独自の制約**: `sbm.rs`のGPUカーネルは`NUM_SPINS=64`
+     固定(共有メモリサイズのコンパイル時固定)のため、補助スピン1個を
+     含め、タスク数+スラックビット数は63個までに制限される(超過時は
+     `Err`)。
+  4. **実機検証(NVIDIA GT730、型チェックのみで完了と報告しない方針を
+     徹底)**: `cargo test -p dream-os-kernel --release`
+     (CPU参照実装、`cpu_sbm_task_selection_respects_budget_and_
+     approaches_brute_force_optimum`——5候補のナップサック問題で予算
+     遵守+全探索最適値の75%以上を確認、`rejects_too_many_candidates_
+     for_the_fixed_num_spins_kernel`——64候補超過時のエラー確認)、
+     新規`tests/task_scheduler_real_vulkan.rs`
+     (`gpu_task_selection_respects_budget_and_approaches_brute_force_
+     optimum_on_real_hardware`)で実Vulkanデバイス経由の
+     `optimize_task_selection_gpu`を実行し、`keep=["render_pass",
+     "flash_attention_prefill"]`・`cost=50/60`・`value=15.00`(全探索
+     最適値18.00の83.3%、`used_sbm_solution=true`)を実機で確認。
+     `cargo build --workspace --release`/`cargo test --workspace
+     --release`/`cargo clippy --workspace --all-targets --release --
+     -D warnings`いずれもregression無し・警告0件。
+  5. **正直な開示・スコープ**: (a) 5候補程度の規模は全探索でも瞬時に
+     解けるため、SBMを使う実用上の必要性は薄い——「SBMが無ければ
+     解けない」という主張はしていない(既存の`RS-SmartTCP`/
+     `aruaru-llm`と同じ立ち位置、あくまで既存GPUディスパッチ経路への
+     実配線・実機検証が目的)。(b) 実際に`power_profile::
+     MiningPowerProfile`や実行中のタスクキューから呼び出す統合配線は
+     今回未実装(このモジュール自体の正しさの実証に留めた)。
+     (c) open-english/open-easy-web/open-web-server/aruaru-db/
+     PostgreSQL等、ユーザー指示に列挙された他リポジトリについては、
+     既存のHANDOFF(`dream-os-wire`のRS-SmartTCP/aruaru-db連携、
+     `directx_bridge`のopen-directx連携等)で既に実装済みの範囲を
+     踏襲し、今回新たなコード変更は加えていない——重複実装を避ける
+     既存方針の継続。
+  - 次にすべきこと: (1) `task_scheduler`を実際に`power_profile`や
+    将来のタスクキュー実装から呼ぶ統合配線、(2) より多くの候補・
+    複数予算次元(電力+VRAM等)がある場合にSBMを使う実用上の意味が
+    増す可能性の検証、(3) 他のsbm.rs利用箇所(mining等)にも同種の
+    符号規約チェックリストを適用し、同じ罠を踏んでいないか確認する
+    (今回発見した「h項欠落」「符号規約不一致」は他の将来のQUBO配線
+    でも再発しうる既知の罠として記録)。
+
+- **2026-08-11 「データを紛失しない設計思想」を`RS-SmartTCP`から
+  `dream-os-wire`へ移植(ユーザー指示「RS-SmartTCPの4層4重の通信と
+  ACID互換…その設計思想は、dream-osにも活かして」への対応)**:
+  1. **背景**: 同日、`RS-SmartTCP`側で「4層4重の通信とACID互換、
+     オンライン証券などのネット上のDATAを紛失しない設計思想」への
+     対応として、`redundant_transmission`(最大4経路への並行送信、
+     最初の成功を採用)+`transaction_log`(CRC32チェックサム+fsyncに
+     よるWAL、Atomicity/Consistency/Durability)を新規実装した
+     (`RS-SmartTCP/CLAUDE.md`同日HANDOFF参照)。dream-os側は既に
+     `dream-os-wire::WorkerChannel`(`open-web-server-wire::
+     SecureChannel`によるAEAD暗号化+リプレイ対策)を持っていたが、
+     **送信が全経路失敗した場合にデータが失われる**という弱点が
+     残っていた——今回はこれを埋める形でRS-SmartTCPを再利用した。
+  2. **実装**: `dream-os-wire/Cargo.toml`に`rs-smarttcp`をpath依存
+     として追加。`WorkerChannel::submit_durable()`を新設——
+     (a)`submit()`と同じくJSONシリアライズ+AEAD暗号化を行い、
+     (b)結果フレームを`rs_smarttcp::transaction_log::TransactionLog`
+     へ`fsync`まで確実に書き込んでから、(c)呼び出し側が渡した最大
+     4本の送信クロージャを`rs_smarttcp::redundant_transmission::
+     send_redundant`で並行実行し最初の成功を採用する。
+  3. **正直な開示(重要、既存方針を踏襲)**: これは「本当に4つの
+     独立した物理伝送路(TCP/UDP/QUIC/MPTCP)を同時に使う」実配線
+     ではなく、呼び出し側が渡した送信クロージャをオーケストレーション
+     する層に留まる——実際の伝送路多重化は既存の`open-web-server-wire`
+     の`quic_channel`/`udp_channel`/`mptcp_channel`(前述の通り
+     引き続き未配線)が担う想定。また再送処理自体(WALを定期的に
+     読んで未送信分を再試行するバックグラウンドループ)も呼び出し側の
+     責務として実装していない。
+  4. **検証(型チェックのみで完了と報告しない方針を徹底)**:
+     `cargo build -p dream-os-wire --release`成功、`cargo test -p
+     dream-os-wire --release`**新規2件全green**(既存の
+     `aruaru_db_integration`1件・`secure_channel_integration`3件も
+     regression無し、実aruaru-db接続を伴う既存テストも引き続き成功)。
+     新規テストで、(a) 1本目が失敗しても2本目で成功しWALに1件記録が
+     残ること、(b) 全経路が失敗してもWALの記録自体は失われず
+     `Err`として正直に呼び出し元へ伝わること、の両方を実際のファイル
+     I/Oで確認。`cargo build --workspace --release`でワークスペース
+     全体もregression無し。
+  - 次にすべきこと: (1) `submit_durable`を実際にWorld Laboratory
+    コーディネータ本体(未実装)から呼ぶ配線、(2) WALを定期的に
+    読んで未送信分を再送するバックグラウンドタスクの実装(現状は
+    「WALに残っていることの確認」までで、自動再送ループは無い)、
+    (3) 本当の意味での4重伝送路(`open-web-server-wire`の
+    `quic_channel`/`udp_channel`/`mptcp_channel`)配線は引き続き未着手、
+    (4) open-directxの完成度向上が優先方針のため、本格拡張は引き続き
+    小さく育てる。
+
+- **2026-08-08(続き2) `dream-os-raid-bridge`にrunnableデモを追加(使いやすさ
+  改善)、`dream-os-kernel/src/lib.rs`のTODO調査(コード変更なし、正直な
+  開示)。rs-sync横断セッション(dream-os/open-directxを対象範囲とした
+  インクリメント作業)の一環**:
+  1. **調査結果**: `dream-os-kernel/src/lib.rs`を実際に読み、`grep`で
+     `TODO`/`未実装`/`allow(dead_code)`/`unimplemented!`を検索したが
+     **1件も見当たらなかった**——同日早い段階の別セッションの調査結果
+     (「唯一のTODO/allow(dead_code)ヒットファイル」という記述)は、実際に
+     このファイルを直接確認した限りでは裏付けが取れなかった。誤った
+     前提に基づいてコードを書かないよう、正直にこの食い違いを記録する
+     (このファイル自体への変更は無し)。
+  2. **`dream-os-raid-bridge`へrunnableデモを追加**: 直前の2026-08-08
+     エントリで新設された`dream-os-raid-bridge`クレートには`src/lib.rs`+
+     テスト1本(`tests/raid6_bridge_real.rs`)のみで、`dream-os-kernel`の
+     `examples/sbm_benchmark.rs`/`mine_benchmark.rs`のような「テストの
+     ソースコードを読まなくても1コマンドで動作確認できるデモ」が無い
+     という使いやすさのギャップがあったため(open-directx側の
+     2026-07-27付「See it actually draw something」エントリと同じ問題
+     意識)、新規`examples/raid6_bridge_benchmark.rs`を追加した。
+     `build_loopback_raid6`/`detect_parity_accelerator`という既存の
+     公開APIをそのまま呼ぶだけで、新しいRAID/GPUロジックは一切
+     書いていない(車輪の再発明を避ける、既存方針の継続)。
+  3. **実機検証(NVIDIA GT 730)**: `cargo run -p dream-os-raid-bridge
+     --example raid6_bridge_benchmark --release`を実際に実行し、以下を
+     確認した(誇張なし、実出力そのまま):
+     ```
+     RAID6パリティアクセラレータ: Gpu (CPUフォールバック: false)
+     roundtrip: 8 stripes x 16384 bytes each, all match: true
+     self-heal after corrupting disk #1: data matches original: true, reported healed/mismatched disks: 1
+     OK: RAID6/Z2 write/read roundtrip and single-disk self-heal both verified on this machine
+     ```
+     アクセラレータが実際に`Gpu`(CPUフォールバックではない)であること、
+     8ストライプ全ての書き込み・読み出しラウンドトリップが一致すること、
+     1台のディスクを直接壊した状態から自己修復できることを実機で
+     確認した(既存の`tests/raid6_bridge_real.rs`と同じ検証内容を、
+     独立したrunnableバイナリとして提供する形)。
+  4. **ワークスペース全体の検証**: `cargo build --workspace --release`・
+     `cargo clippy --workspace --all-targets --release -- -D warnings`
+     いずれも警告0件。`cargo test -p dream-os-raid-bridge --release --
+     --nocapture`は既存2件のテストとも回帰なくgreen。
+  5. **正直な開示・今回はやらなかったこと**: (1) Android実機
+     (Moto G53Y、Adreno 619)へのこのデモのクロスビルド・実機実行は
+     今回試みていない(`open_raid_z_core`/`zfs_accel_hlsl`が
+     `aarch64-linux-android`ターゲットでビルド可能かは未検証、
+     `dream_os_status`のAndroidクロスビルドとは別のクレート依存関係の
+     ため保証されていない)。(2) flash-attentionブリッジ・
+     `directx_bridge`側の粗探しは今回時間の都合で見送った(調査は
+     `dream-os-kernel/src/lib.rs`のみ)。(3) Androidデモアプリ
+     (`android/`)を「flash-attentionのgpu==cpu_reference結果を表示する」
+     以上に拡張する作業(RAID6ブリッジの結果を画面表示する等)も
+     今回は行っていない——直前の2026-08-08エントリで既に
+     flash-attentionの実数値比較結果がAndroid実機アプリ画面上に表示
+     されていることを確認済みのため(「health checkだけでなく実際の
+     計算結果を表示する」という目標は既に達成済みと判断し、重複した
+     拡張は行わなかった)。
+  - 次にすべきこと: (1) `raid6_bridge_benchmark`のAndroid実機
+    クロスビルド検証(`open_raid_z_core`/`zfs_accel_hlsl`の
+    `aarch64-linux-android`対応状況の確認から)、(2) 前回エントリの
+    「次にすべきこと」全体(実NVMe複数枚での検証、(a)(b)の4重伝送路・
+    4重DB書き込みの本格配線、aruaru-llmクライアント層の設計等)は
+    変更なし、(3) `open-directx`側は同日並行して境界チェック付き
+    7項チェーンのDXIL側実装(DXBC/DXIL非対称の解消)を実施済み
+    (詳細は`open-directx/CLAUDE.md`参照、本リポジトリのファイルには
+    一切触れていない独立した増分)。
+
+- **2026-08-08 open-raid-zのRAID6/Z2実装をdream-osへブリッジ(実GPU検証済み)+
+  GPU電力調整・LLM推薦機能の実機調査(コード追加は前者のみ、他は正直な
+  計画記録)**: ユーザー指示「open-directx・open-cuda・aruaru-llm・
+  open-web-server・RPoem・open-raid-z・aruaru-dbの良い部分をdream-osへ
+  並行して取り込み、(a)4層4重通信、(b)ACID/ZFS互換、(c)CPU+NPU+GPU
+  DirectXアクセラレータ対応のRAID6 Z2実装、(d)4〜16枚NVMe想定のRAID6
+  高速化、を統合・実用性・完成度向上」+セッション中の追加指示「(e)
+  グラフィックボードの電力調整可能なマイニングOS機能」「(f)推薦LLM
+  ダウンロード機能・LLM利用機能」への対応。**大規模な構想のため一度に
+  全部作らず、実際に検証できる範囲だけ実装し、残りは正直な設計文書化に
+  留めた**(このエコシステムの既存方針通り)。
+
+  ### (c)(d) 実装: 新規`crates/dream-os-raid-bridge`(実GPU検証済み)
+
+  調査の結果、**(c)(d)は`open-raid-z`側に既にほぼ完全な形で実装済み**
+  だったと判明——ゼロから作る必要はなく、再利用するだけで済んだ:
+  `open-raid-z/open_runo_zfs_source/open_raid_z_core::vdev::RaidZVdev`
+  (RAID-Z2/Z3、GF(2^8) Reed-SolomonのP/Qパリティ、`RaidLevel::Raid6`は
+  `Z2`のエイリアス)+`zfs_accel_hlsl`(D3D12/DirectML〈Windows〉・
+  Vulkan Compute〈Linux/Android、NPU/GPU自動検出、`device::
+  detect_best_accelerator`〉)、さらに`open_raid_z_core/examples/
+  raidz2_parity_benchmark.rs`で4〜8枚のNVMeを模したループバック
+  ベンチマークまで既に存在していた。そこで新規crate
+  `dream-os-raid-bridge`(`src/lib.rs`)をpath依存(コード複製ではない、
+  `directx_bridge.rs`と同じ方針)で追加し、`detect_parity_accelerator`/
+  `build_loopback_raid6`という薄いラッパーを提供、ルート`Cargo.toml`の
+  `members`へ追加した。
+
+  **実機検証(NVIDIA GT730、Windows)**: `tests/raid6_bridge_real.rs`
+  2件——(1) 4データ+2パリティ(RAID6/Z2)構成でストライプ書き込み→
+  読み出しのラウンドトリップ一致、(2) 1台のディスクを直接壊した状態
+  からの`read_stripe_with_report`による自己修復(パリティ2本のRAID6は
+  1台までのサイレント破損から復元できる)。**`detect_best_accelerator()`
+  が実際に`AccelKind::Gpu`(CPUフォールバックではない)を返し、GT730の
+  D3D12/DirectML経由でパリティ計算が実行されたことを`--nocapture`の
+  実行結果で確認**(`RAID6パリティアクセラレータ: Gpu (CPUフォールバック:
+  false)`)——「RAID6 Z2 + GPU DirectXアクセラレータ」という(c)の要求を
+  実機で満たせることを実証。`cargo build --workspace --release`/
+  `cargo test -p dream-os-raid-bridge --release`で確認、既存クレート
+  (同時進行中の別セッションによる`flash_attention_bridge`等の未コミット
+  変更を含む)との衝突・regressionは無いことも`cargo build --workspace`
+  で確認した。
+
+  **正直な開示・未実装/未検証**: (1) 4〜16枚という要求のうち実機検証は
+  6枚構成(4データ+2パリティ)のループバックファイルのみ、実NVMe複数枚
+  はこのマシンに無く検証不可能。(2) `opencuda_vulkan`(dream-os-kernelの
+  Vulkan基盤)と`zfs_accel_hlsl`の実行基盤は別々のデバイスハンドルの
+  ままで統合していない(設計目的が異なるため安易な統合は避けた)。
+  (3) NPU経由のパリティ計算はこのマシンにNPUが無いため未検証(コード上は
+  `AccelKind::Npu`分岐が存在しCPU/GPUと同じ経路を通る設計だが実機確認は
+  次回課題)。
+
+  ### (a)(b) 統合方針の再確認(コード変更なし、既存実装の棚卸し)
+
+  調査の結果、(a)(4層4重通信・金融データ相当の耐障害性)・(b)(ACID/ZFS
+  互換)は**dream-os側に既に部分実装済み**であることを再確認した(過去の
+  HANDOFF参照): `crates/dream-os-wire`が`open-web-server-wire::
+  SecureChannel`(AEAD+リプレイ対策、path依存)を再利用しペイロード層の
+  改ざん・リプレイ耐性を実証済み(第1層の4重伝送路〈TCP/UDP/QUIC/MPTCP〉
+  は未配線)、`crates/dream-os-wire/src/aruaru_persistence.rs`が
+  `aruaru-db`(ACID互換+Git-on-SQL)への実接続・INSERT・コミットを実証
+  済み(4重DB書き込み・`open-web-server-ledger`のマルチリージョン
+  レプリケーション・独立監査ログは実DBインスタンス不足のため未配線)。
+  今回のセッションでは、この2つを更に前進させるコードは書いていない
+  (`open-raid-z`ブリッジに集中したため)——次回の課題として維持する。
+
+  ### (e) グラフィックボード電力調整(マイニングOS機能): 実機で調査、
+  ハードウェア制約により未実装(正直な開示)
+
+  既存の`crates/dream-os-kernel/src/power_profile.rs`は
+  ディスパッチ間の休止によるソフトウェア側デューティサイクル制御のみ
+  (ハードウェアの電力制限APIは使っていない)だったため、今回
+  NVML相当の実ハードウェア電力制限(`nvidia-smi -pl`等)が実機で使えるか
+  調査した。**実際に`nvidia-smi -q -d POWER`・`nvidia-smi --query-gpu=
+  power.draw,power.limit,power.min_limit,power.max_limit,power.
+  default_limit --format=csv`をこのマシン(NVIDIA GT730、Driver
+  475.14)で実行して確認した結果、Power Management/Power Draw/Power
+  Limit等が全項目`N/A`だった**——GT730(Kepler世代の下位モデル)は
+  NVML/nvidia-smiの電力管理機能自体をハードウェアレベルでサポートして
+  いないことを実機で確認した(読み取りすら不可能、調整以前の問題)。
+  この結果、(1) 実ハードウェア電力制限の読み取り・調整のいずれも
+  このマシンでは検証不可能と判明したため実装を見送った(危険な当て
+  推量でのNVML APIコード追加はしない、というユーザー指示の安全方針にも
+  合致)、(2) 既存の`power_profile.rs`のソフトウェア側デューティサイクル
+  制御が、このエコシステムで現状唯一実機検証可能な「電力調整」手段
+  であることを再確認した。
+  - 次にすべきこと: 電力管理に対応した実GPU(GT730以外)が入手できた
+    場合、`nvml-wrapper`クレート(実在するRust製NVML安全バインディング、
+    今回未追加)経由での読み取り→保守的な範囲での調整→読み戻し確認、
+    という段階を踏んだ実装を検討する。それまでは`power_profile.rs`の
+    ソフトウェア方式を正としてドキュメント化しておく。
+
+  ### (f) 推薦LLMダウンロード・利用機能: aruaru-llmに既に実装済みと判明、
+  dream-os側では未実装(正直な開示、reuse方針)
+
+  調査の結果、**この機能は`aruaru-llm`側に既にほぼそのまま実装済み**
+  だった: `aruaru-llm/src/hardware.rs`(`opencuda-vulkan`/
+  `opencuda-directx`経由のGPU検出→VRAM容量からの推奨モデルサイズ判定、
+  DirectX優先・Vulkanはクロスチェック)+`aruaru-llm/src/model_catalog.rs`
+  (Hugging Face `resolve/main/`からのGPT-2系モデルのダウンロード・
+  インストール、ライセンス注記付き、ユーザー明示リクエスト時のみ実行)。
+  **このエコシステムの「既存実装の再利用を優先し重複実装を避ける」という
+  一貫した方針に従い、今回dream-os側に同等機能を再実装するコードは
+  書いていない**——安易な複製は既存方針(車輪の再発明回避)に反すると
+  判断した。
+  - 次にすべきこと: dream-osを「推薦LLMダウンロード・利用」機能の
+    フロントエンドにしたい場合、`aruaru-llm`をサブプロセス起動
+    (`open-web-server`のAndroid実装が使う`ProcessBuilder`方式、
+    `android/app/src/main/java/.../MainActivity.kt`と同じパターン)する
+    か、HTTP API経由で呼び出すクライアント層を`dream-os-kernel`または
+    新規crateとして追加する設計を検討する(aruaru-llm本体は変更しない、
+    read-onlyな連携のみ)。今回は時間の都合上、この設計の特定と
+    HANDOFF記録までに留めた。
+
+  - 次にすべきこと(全体、優先順): (1) `dream-os-raid-bridge`の実NVMe
+    複数枚(4〜16枚)での実機検証(実ドライブ入手後)、(2) (a)(b)の
+    4重伝送路・4重DB書き込みの本格配線(引き続き未着手)、(3) aruaru-llm
+    クライアント層の設計・実装、(4) 電力管理対応GPU入手後の`nvml-wrapper`
+    連携検討、(5) open-directxの完成度向上が引き続き優先方針のため、
+    本格拡張は小さく育てる方針を継続。
+
+- **2026-08-08 open-cuda製fused flash-attention SPIR-Vカーネルをdream-os
+  の共通Vulkan実行基盤経由で実行、Windows実機・Android実機の両方で実証
+  (rs-sync横断セッション、直前2026-08-07(続き3)HANDOFFの「次にすべきこと」
+  への対応、`directx_bridge.rs`に続く2つ目の「共通実行基盤」実装例)**:
+  1. **新規`crates/dream-os-kernel/src/flash_attention_bridge.rs`**:
+     `open-cuda-llm`のDecoderLayerへ既に配線・実機検証済みの
+     `opencuda-blas::flash_attention_with_spirv`(QKᵀ・オンラインsoftmax・
+     P·Vを1回のディスパッチで完結させるfusedカーネル)を、
+     `dream-os-kernel`の`open_device()`(Vulkan実行基盤)経由でそのまま
+     呼び出す`dispatch_flash_attention()`を実装。シェーダ本体
+     (`flash_attention.spv`)は`open-cuda`側の既存アセットを
+     `include_bytes!`でそのまま取り込み(独自コピーは作らない)。
+     `Cargo.toml`に`opencuda-blas`をpath依存として追加。
+  2. **`examples/dream_os_status.rs`を拡張**: 既存のopen-directx DXBC→
+     SPIR-Vディスパッチに続けて、8×16のQ/K/Vでflash-attentionを実行し、
+     GPU結果とCPU参照実装(`opencuda-blas::flash_attention`)が数値一致
+     するかまで実際に計算・比較して表示するようにした。
+  3. **実機検証(型チェックのみで完了と報告しない方針を徹底)**:
+     - Windows実機(NVIDIA GT 730): `cargo test --workspace --release`
+       (新規`tests/flash_attention_bridge_real_vulkan.rs`含め全件green、
+       既存の`directx_bridge`/`mining`/`sbm`/`aruaru_db_integration`/
+       `secure_channel_integration`もregression無し)。
+       `cargo run --example dream_os_status --release`を実行し、
+       `open-cuda flash-attention SPIR-V dispatch: seq_len=8, head_dim=16,
+       gpu==cpu_reference: true`・`result: OK`を実機ログで確認。
+     - `cargo clippy --workspace --all-targets --release -- -D warnings`
+       で、今回のチェーン拡張とは無関係のpre-existing警告2件
+       (`directx_bridge.rs`の`manual_slice_size_calculation`、
+       `sbm.rs`の`run_sbm_ising`の`too_many_arguments`、clippyのlint
+       ルール追加によるもの)を検出・修正し、workspace全体で警告0件を
+       達成。
+     - **Android実機(Moto G53Y 5G、Adreno 619、シリアル`ZY22J7RFND`、
+       `adb`接続確認済み)**: `cargo ndk -t aarch64-linux-android build
+       --release --example dream_os_status`でクロスビルドし、
+       `adb push`(PowerShell経由)で実機へ配置・実行。
+       `vulkan device: OpenCUDA Vulkan Device (Adreno (TM) 619)`・
+       `open-cuda flash-attention SPIR-V dispatch: seq_len=8, head_dim=16,
+       gpu==cpu_reference: true`・`result: OK`を実機で確認——
+       fused flash-attentionカーネルがモバイルGPU実機上でも正しく動作し
+       CPU参照実装と一致することを初めて実証した。
+     - **Android実機アプリ(APK)経由でも確認**: 上記クロスビルド済み
+       バイナリを`android/app/src/main/jniLibs/arm64-v8a/
+       libdreamosstatus.so`へ差し替え、`gradle :app:assembleDebug`
+       (`BUILD SUCCESSFUL`)→`adb install -r`→実機のボタンを実際に
+       タップ→`adb shell screencap`で実機画面をキャプチャし、
+       アプリUI上に上記結果が表示されることをスクリーンショットで確認
+       (シェーダーは`include_bytes!`でバイナリへ埋め込み済みのため、
+       DXBC/flash-attention双方とも実行時の外部ファイル配置は不要——
+       単一の実行ファイルをAPKへ同梱するだけで完結する設計)。
+  4. **正直な開示・スコープの限界**: (a) 8×16という極めて小さいQ/K/V
+     でのPoCであり、GPT-2 124M実寸(`head_dim=64`、`seq_len`は生成長に
+     依存)での速度・大規模データでの数値安定性は未検証。(b) これは
+     「dream-osの共通実行基盤からopen-cudaの既存fusedカーネルをそのまま
+     再利用できる」ことの実証に留まり、dream-os自体が新しい推論
+     ワークロード(例: World Laboratoryのワーカー層でのLLM推論タスク)を
+     持つところまでは実装していない。(c) `directx_bridge`同様、
+     Windows/Androidのみの検証で、AMD/Intel/Linux/macOS実機は未検証
+     (実機が無いため)。
+  - 次にすべきこと: (1) GPT-2実寸の`head_dim`/`seq_len`でのベンチマーク
+    (現状は8×16のPoC規模のみ)、(2) World Laboratoryコーディネータ本体
+    (RPoem/open-web-server上への実HTTP API)の実装は引き続き未着手、
+    (3) `sbm_ising`が解ける組合せ最適化問題の具体候補の特定
+    (open-directx/open-cuda側からの提案待ち、前回から変化なし)、
+    (4) open-directxの完成度向上が優先方針のため、本格拡張は引き続き
+    小さく育てる。
+
+- **2026-08-07(続き3) open-directx/open-cuda/aruaru-llmとの関連性・連携性
+  調査(ユーザー指示「4リポジトリの関連性・連携性・実用性・完成度を向上」、
+  本リポジトリへのコード変更は無し、正直な開示)**: `open-cuda`側CLAUDE.md
+  冒頭の保留タスク(東芝SBM〈`sbm_ising`〉/DeepSeek技術を8リポジトリへ
+  組み込む構想)を踏まえ、`crates/dream-os-kernel/src/sbm.rs`
+  (64スピンPoC)・`mining.rs`(open-cuda連携のsha256d_mineカーネル
+  ディスパッチ)・`directx_bridge.rs`(open-directx連携)を再確認したが、
+  この構想の前提である「`open-directx`/`open-cuda`側で`sbm_ising`を
+  適用できる具体的な組合せ最適化問題を先に特定する」という調査自体は
+  今回未着手(`open-directx`側の境界チェック付きチェーン生成の内部構造
+  ・`open-cuda`側のGEMM/Attentionディスパッチスケジューリングのいずれも、
+  安易に「SBMで最適化できそう」と決め打ちすると憶測に基づく実装になる
+  リスクがあると判断したため、慎重に見送った)。`cargo build --workspace`
+  で既存の健全性(警告0件)のみ再確認した。`open-cuda`側では今回
+  `open-cuda-llm`のAttention経路への`flash_attention_with_spirv`配線
+  (実機検証済み、詳細は`open-cuda/CLAUDE.md` 2026-08-07(続き5)HANDOFF
+  参照)を実施しており、これは`sha256d_mine`カーネル(本リポジトリが
+  依存する既存の連携経路)とは独立した別のディスパッチ経路のため、
+  本リポジトリの`mining.rs`側の呼び出しには影響しない(念のため
+  `cargo test -p dream-os-kernel`で既存テストの回帰も確認、変更なし)。
+  - 次にすべきこと: (1) `open-directx`/`open-cuda`側それぞれで
+    「`sbm_ising`が解ける組合せ最適化問題」の具体候補を1つ以上特定して
+    から着手する(本リポジトリ単独では相手側の内部構造への理解が
+    不足しており特定できない、両リポジトリ側からの提案を待つ形が
+    現実的)、(2) Android実機連携(直前HANDOFF群)の延長として、
+    `sbm_ising`は既に`opencuda_core::GpuDevice`経由のGPUディスパッチを
+    持つ(`crates/dream-os-kernel/tests/sbm_real_vulkan.rs::
+    gpu_sbm_ising_matches_cpu_reference_on_real_hardware`で実機検証
+    済みと確認、本エントリを書く前に`cargo test -p dream-os-kernel`を
+    実行して確認——当初「CPU実装のみ」と誤って書きかけたが、テスト
+    実行結果で訂正した)ため、Android実機(Adreno 619)上でこの既存の
+    GPU経路を使う設計自体は既に成立しているはずだが、Android実機上での
+    `sbm_ising`のGPU経路の実行確認(`mining.rs`のsha256d_mineとは別に)
+    は未確認のまま(次回確認対象)。
+
+- **2026-08-07(続き2) DreamOS用Android連携アプリ(実APK、ProcessBuilder
+  方式)を新規実装・実機画面で動作確認**: 直前のHANDOFFエントリ
+  (`dream_os_status`のAndroid実機コマンドライン実行検証)を踏まえ、
+  今回はその一歩先——`open-web-server`/`open-easy-web`の
+  Android実装(JNIではなく`ProcessBuilder`でネイティブ実行ファイルを
+  起動するサブプロセス方式)を参考にした**実際のAndroidアプリ
+  (APK)**を新規実装し、実機のアプリ画面上での表示まで確認した。
+  - 新規`F:\runo\dream-os\android`(Gradleプロジェクト、package
+    `tokyo.runo.dreamos`)。`gradlew`/`gradle-wrapper.jar`等は
+    `open-web-server/android`から複製(同じGradle 8.11.1系列)。
+  - `cargo ndk -t aarch64-linux-android build -p dream-os-kernel
+    --example dream_os_status --release`でクロスビルドした実行
+    ファイルを`android/app/src/main/jniLibs/arm64-v8a/
+    libdreamosstatus.so`として同梱(open-web-server方式と同じ
+    `useLegacyPackaging=true`でnativeLibraryDir配下への実展開を強制)。
+  - `MainActivity.kt`(新規)——ボタン押下で`ProcessBuilder`により
+    このバイナリを起動し、標準出力をそのままTextViewへ表示する
+    最小実装。DreamOS固有ロジックはActivity側に一切持たせず、
+    表示ロジックのみを担う。
+  - **実機検証(Moto G53Y 5G、Adreno 619、シリアル`ZY22J7RFND`)**:
+    (a) `gradle :app:assembleDebug`(`JAVA_HOME`はAndroid Studio同梱
+    jbrを使用)で**BUILD SUCCESSFUL**(`app-debug.apk`、約3.8MB)。
+    (b) `adb install -r`→`adb shell am start`で実機へインストール・
+    起動。(c) `adb shell input tap`でボタンを実タップし、
+    `adb shell screencap`で実機画面を実際にキャプチャ——**アプリ画面上に
+    `binary: /data/app/.../lib/arm64/libdreamosstatus.so`・
+    `exit code: 0`・`vulkan device: OpenCUDA Vulkan Device
+    (Adreno (TM) 619)`・`open-directx DXBC->SPIR-V dispatch: 256
+    elements, 0 mismatches`・`result: OK`が表示されることを
+    スクリーンショットで確認**——型チェック・ビルド成功・コマンドライン
+    実行の確認だけでなく、実際のAndroidアプリUI上での動作を実証できた
+    (直前エントリまでの到達点から一歩前進)。
+  - **正直な開示・未着手事項**: (a) サブプロセス方式のまま(JNI/UniFFI
+    等によるネイティブライブラリ直接リンクではない)——将来「DreamOS
+    共通実行基盤」としてより深く統合するなら発展の余地がある。
+    (b) `dream_os_status`example1本のみを同梱、mining/sbm等の他
+    カーネルはこのアプリからは呼べない。(c) x86_64エミュレータ向け
+    jniLibsは同梱せず実機arm64-v8aのみ対象。(d) `.gitignore`へ
+    `android/.gradle/`・`android/app/build/`・`android/local.properties`
+    等を追加し、ビルド成果物・SDKローカルパスはコミット対象から除外。
+    git add/git commitは今回実行していない(ユーザー確認後の判断待ち)。
+  - 次にすべきこと: (1) JNI/UniFFI等でのネイティブ直接リンク方式への
+    発展検討、(2) mining/sbm等の他カーネルを選択実行できるUIへの拡張、
+    (3) x86_64エミュレータ向けjniLibs追加、(4) World Laboratory
+    コーディネータ本体の実装(引き続き未着手)、(5) open-directxの
+    完成度向上が優先方針のため、本格拡張は引き続き小さく育てる。
+
+- **2026-08-07(続き) 共通実行基盤の再検証+dream_os_statusのAndroid実機
+  実行を新規確認**: ユーザー指示「open-directx/open-cudaを土台にした共通
+  実行基盤の検証、Android連携PoCの実装・実機/ビルド検証を完了させる」への
+  対応。コードの新規追加はコミット済みの直前HANDOFF時点で完了していたため、
+  今回は(1)退行が無いことの再確認と、(2)これまで未実施だった
+  `examples/dream_os_status.rs`(状態確認用の最小サンプル、OS/アーキ
+  テクチャ・Vulkanデバイス名・open-directxブリッジの動作可否を1コマンドで
+  表示する)のAndroid実機実行、の2点を実施。
+  **再検証結果**: `cargo build --workspace --release`・`cargo test
+  --workspace --release`をWindows実機(GT730)で実行し全件green(退行無し、
+  power_profile単体テスト5件・GPU実機テスト5件〈mining/sbm/directx_bridge/
+  aruaru_db_integration/secure_channel_integration〉すべて成功)。続けて
+  `cargo ndk -t aarch64-linux-android build --release`(ライブラリ)・
+  `--examples`(実行バイナリ)の両方をクロスビルドし、`dream-os-kernel`・
+  `dream-os-wire`の`.rlib`および`dream_os_status`・`sbm_benchmark`・
+  `directx_bridge_benchmark`・`mine_benchmark`の全実行バイナリが生成される
+  ことを確認。**Android実機(Moto G53Y 5G、Adreno 619、シリアル
+  `ZY22J7RFND`)へ`adb push`(PowerShell経由、既存の申し送り通り)で
+  配置し実行**:
+  - `dream_os_status`(今回初のAndroid実機実行): `vulkan device: OpenCUDA
+    Vulkan Device (Adreno (TM) 619)`・`DXBC->SPIR-V dispatch: 256
+    elements, 0 mismatches`・`result: OK`を実機で確認。
+  - `sbm_benchmark`・`mine_benchmark`・`directx_bridge_benchmark`は
+    shaders(`.spv`)を`/data/local/tmp/shaders/`へ同時pushしないと
+    相対パス解決に失敗する点(`shaders/sbm_ising.spv: No such file or
+    directory`)を今回発見・対処(shaders同梱pushで解消、コード変更は
+    不要——実行手順上の注意点としてここに記録)。対処後、sbmは
+    Windows実機と同じエネルギー値`-38.0885`でGPU/CPU完全一致、mining
+    は3バッチとも`device lost`等の異常無く約0.10 MH/sで完走、
+    directx_bridgeは256要素すべてCPU参照実装と一致。
+  - コード変更・コミットは無し(検証のみ、ユーザー指示によりコミット
+    未作成)。
+  - 次にすべきこと: (1)
+    今回判明した「Android実機実行時はshaders/ディレクトリを実行バイナリと
+    同じ相対位置へ`adb push`する必要がある」という手順を、将来デプロイ
+    自動化スクリプト(あれば)やREADME/PORTING.mdの実行手順節に明記する、
+    (2) World Laboratoryコーディネータ本体(RPoem/open-web-server上への
+    実HTTP API)の実装、(3) aruaru-llmとの連携(LLM推論タスクの
+    ワークロード種別追加)、(4) 複数GPU対応は引き続き実機が無く未着手、
+    (5) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
+- **2026-08-07 sbm_ising/directx_bridgeのAndroid実機検証**: ユーザー指示
+  「dream-os・open-directx・open-cuda・aruaru-llmの連携性強化・実用性
+  向上・利便性向上・完成度向上」への対応として、上記「次にすべきこと」
+  最優先項目だった「Android実機でのsbm_ising/directx_bridgeの実機検証」
+  (これまでmining.rsのみAndroid実機検証済みで、sbm.rs/directx_bridge.rs
+  はWindows実機のみだった)を実施。
+  `crates/dream-os-kernel/examples/sbm_benchmark.rs`・
+  `examples/directx_bridge_benchmark.rs`(新規)を、既存の
+  `mine_benchmark.rs`と同じパターン(`cargo test`がAndroidクロス
+  ビルド環境では動かせないため、`adb push`して直接実行できる単体
+  バイナリとして提供)で追加。テスト本体(`tests/sbm_real_vulkan.rs`・
+  `tests/directx_bridge_real_vulkan.rs`)と同じ検証ロジックを移植した。
+  **実機検証結果**: Windows実機(NVIDIA GT730)で両方とも成功を確認した
+  上で、`cargo ndk -t aarch64-linux-android build --release`でクロス
+  ビルドし、PowerShell経由の`adb push`(Git BashからのUnixパス自動変換
+  問題を過去に踏んだため、既存の申し送り通りPowerShellから`adb`を
+  呼んだ)でAndroid実機(Moto G53Y 5G、Adreno 619)へ配置・実行。
+  - `sbm_benchmark`: GPU/CPU参照実装が64/64スピン完全一致
+    (Windows実機と同じエネルギー値`-38.0885`)。
+  - `directx_bridge_benchmark`: open-directx製DXBC→SPIR-V翻訳が
+    Android実機のVulkan実行基盤上でも256要素すべてCPU参照実装と一致。
+  mining.rsで発見した`device lost`のような不安定挙動は今回発生せず
+  (問題規模が小さいディスパッチ1回のみのため)。`cargo build
+  --workspace --release`/`cargo test --workspace --release`で全クレート
+  regression無し(GT730実機込み)。
+  - 次にすべきこと: (1) World Laboratoryコーディネータ本体
+    (RPoem/open-web-server上への実HTTP API)の実装、(2) aruaru-llmとの
+    連携(World Laboratoryのワークロード種別としてLLM推論タスクを追加)、
+    (3) 複数GPU対応は引き続きこのマシンに実機が無いため未着手のまま、
+    (4) open-directxの完成度向上が優先方針のため、引き続き小さく育てる。
+
+- **2026-08-06(続き2) 実機ベースでスコープを絞り込み**: 上記
+  「スコープの絞り込み」節を参照。macOS/iPhone・PS5/6・Switch2は
+  「将来ライセンス取得を前提とした保留」へ変更し、Windows(GT730実機)・
+  Android(実機数台)の2プラットフォームで着手できることから始める方針に
+  転換。まだ具体的なコード実装・PoC設計には着手していない(次回以降)。
+
+- **2026-08-06(続き) 日英でのGoogle/GitHub調査を実施**: ユーザー指示
+  「まずは、日本語と英語でGoogleとGithub検索と調査から始めて下さい」への
+  対応。詳細は上記「技術調査結果」節参照。要点:
+  1. Linux×TRONのハイブリッドカーネルは、2001年のIEEE論文に組み込み
+     向けの先行研究はあるが、現行メンテナンスされているOSSは無く、
+     GitHub検索でも該当リポジトリ0件。TRONとPOSIX系の設計思想の
+     根本的な相性の悪さを指摘する分析も見つかった。
+  2. Windows/macOS/Androidアプリを単一OSで同時に動かす製品・OSSは
+     見つからなかったが、個別要素技術(Wine/Proton、Darling、Waydroid)は
+     実在し、それらを「共通VMM基盤上で複数ゲストOSとして統合管理する」
+     ChromeOS(crosvm)方式が最も実績のある現実的な先例だと判明。
+     seL4+Genode/Neptune OSの「マイクロカーネル+OSパーソナリティ」方式も
+     参考になる。
+  3. **重要な発見**: iOSアプリをApple以外のハードウェアでネイティブ
+     動作させる実用的な方法は現時点で存在しない(Apple自身がサードパーティ
+     アプリのJIT・仮想化をOSレベルで全面禁止しているため)。この制約は
+     構想全体に関わる重要な事実としてユーザーへ直接報告する。
+  4. PowerShellのクロスプラットフォーム動作は既に解決済みの技術
+     (pwsh/.NET Core、Linux/macOSでネイティブ動作)であり、DreamOS側で
+     独自実装する必要は無い。
+  - 次にすべきこと: (1) 上記調査結果、特にiOSの技術的制約についてユーザーの
+    判断を仰ぐ(スコープから外す/代替アプローチにするか等)、(2) 採用する
+    なら「ChromeOS/crosvm型のVMM統合アーキテクチャ」を軸に、次のフェーズ
+    (具体的な技術選定・PoC設計)へ進む、(3) open-directxの完成度向上が
+    優先方針のため、DreamOSの実装着手はそちらが一段落してからが現実的。
+
+- **2026-08-06 新規作成**: ユーザー指示「(将来的には)今から新規リポジトリと
+  VPSとローカルにもフォルダを新規作成して下さい。名前は、一般名称は
+  DreamOS リポジトリやVPSやローカルドライブのフォルダ名は、dream-os」を
+  受けて着手。GitHub上に2026-07-01作成済みの空リポジトリ`aon-co-jp/dream-os`
+  (コミット0件)が既に存在していたため、それをローカルへclone・
+  ブートストラップする形で対応(`open-directx`と同じ経緯)。ユーザーへの
+  事前確認(`AskUserQuestion`)により、(1) GitHub作成先は`aon-co-jp`、
+  (2) 初回スコープは構想フェーズのみ(コードは書かない)、との回答を得て
+  実施。README.md(日本語)・README-English.md・本CLAUDE.md・PORTING.mdを
+  新規作成しpush。
+  VPS(conoha)側にも`/root/dream-os`フォルダを実際にSSHで新設し
+  (プレースホルダの`README.md`のみ配置、コード・サービス登録は無し)、
+  `ls /root/`で他プロジェクトと並んで存在することを確認済み。
+  - 次にすべきこと: (1) open-directxの完成度がある程度高まった段階で、
+    DreamOSの具体的な技術スコープ(open-directxのVulkan実行基盤を
+    どう共有するか等)を再検討する、(2) VPS側の`/root/dream-os`は
+    現状プレースホルダのみのため、実際にコードを書く段階になったら
+    ローカルと同様にgit clone/git管理下へ置き換える。
+
+---
+
+Other languages: [English](CLAUDE-English.md) · [Deutsch](CLAUDE-German.md) ·
+[Italiano](CLAUDE-Italian.md) · [Français](CLAUDE-French.md) ·
+[Русский](CLAUDE-Russian.md) · [Українська](CLAUDE-Ukrainian.md) ·
+[עברית](CLAUDE-Hebrew.md) · [فارسی](CLAUDE-Persian.md) ·
+[العربية](CLAUDE-Arabic.md)
+
+## HANDOFF追記(2026-09-03) GPU 実行系は open-cuda に委譲する(正本: open-cuda/OmniGPU-Design.md §11・§12)
+
+エコシステム横断の GPU 移植性設計見直し(ユーザー指示、5 リポジトリ対象)。
+**設計の正本は `open-cuda/OmniGPU-Design.md` §11・§12**。
+
+### dream-os への波及方針(§12.3)
+- **dream-os 固有の GPU 移植性コードは追加しない**。open-cuda の
+  `GpuDevice` trait + SPIR-V(唯一の実行時 GPU IR)+ 能力交渉を
+  **そのまま継承**する。
+- dream-os の責務は **OS レベルの GPU 割り当て**(どのプロセスにどれだけ
+  GPU 時間/メモリを配るか)のみ。実行経路は open-cuda へ委譲。
+- 既存の SBM(`sbm_ising`)・`sha256d_mine` カーネルは既に SPIR-V 経由で
+  この原則に合致。東芝 SBM 第3世代("edge of chaos")は SPIR-V カーネルの
+  改良として取り込める(実行系の変更不要)。
+
+今回はコード未着手。CLAUDE.md への方針明記のみ。
+
+### 2026-09-03(続き)世界中の言語で再調査 → 委譲方針は不変
+
+EN/JA/ZH + GitHub 中心で再調査(正本 `open-cuda/OmniGPU-Design.md`
+§11.6)。dream-os への影響がある更新点:
+- `EmbarkStudios/rust-gpu` は 2025-10-31 アーカイブ。dream-os は
+  `rust-gpu` に依存していない(SBM/mining カーネルは open-cuda 経由の
+  SPIR-V)ため影響なし。open-cuda が将来 CubeCL/naga を検討しても
+  dream-os は `GpuDevice` trait を継承するだけで追随不要。
+- llama.cpp が 2026-04 に**バックエンド非依存のテンソル並列**を導入
+  (複数 GPU へ演算単位で分割、ベンダーロックイン無し)。→ dream-os が
+  OS レベルで複数 GPU を複数プロセスへ配分する設計を将来書く際、
+  「GPU をまたぐ実行の分割は open-cuda 側(SPIR-V 単一カーネル + デバイス
+  列挙)、どのプロセスにどの GPU を割り当てるかは dream-os 側」という
+  責務境界がそのまま成立する。
+- 結論: 委譲方針(dream-os は OS レベル割り当てのみ、実行系は open-cuda)は
+  1 行も変更なし。
+
+**English**: World-language + GitHub re-research (source of truth:
+`open-cuda/OmniGPU-Design.md` §11.6). `EmbarkStudios/rust-gpu` was
+archived 2025-10-31 — no impact (dream-os depends on open-cuda's SPIR-V
+path, not rust-gpu). llama.cpp added backend-agnostic tensor parallelism
+(2026-04); the responsibility split holds — cross-GPU execution split
+lives in open-cuda (single SPIR-V kernel + device enumeration), which
+process gets which GPU is dream-os's OS-level job. Delegation policy
+unchanged.
+
+
+## ディスク・マルチブート・インストーラー媒体(2026-10-18、ユーザー指示)
+ユーザー指示「HDDのフォーマット機能とWindowsやLINUXも同時にインストールも同時起動も可能にし、Windowsから作れるUSBインストーラーをCDに焼いてもインストールできるように」を受け、`crates/dream-os-disk`を新設(詳細・使い方・試験結果は[`README.md`](README.md)同名節)。
+- 構成: `gpt.rs`(GPT/CRC/プロテクティブMBR)、`layout.rs`(Windows/Linux/DreamOS配置計算)、`fat32.rs`(FAT32+LFN書き込み)、`iso9660.rs`(ISO9660+Joliet+El Torito UEFI)、`bootcfg.rs`(GRUB・QEMU)、`media.rs`(高レベル操作)、`main.rs`(CLI)。`installer/windows/make-usb.ps1`はUSB複写とCD書き込み起動。
+- 設計判断: 「同時インストール」は、WindowsやLinuxの本体導入を代行せず(ライセンスと確実性のため)**領域の作成・ブートメニュー・共有領域まで**をDreamOSが担う。「同時起動」はマルチブート(GRUBメニュー)と、ホスト上のゲストとして動かすQEMUの2通り。NTFS/ext4は各OSのインストーラーがフォーマットする。実ディスクへの書き込みは完全一致の確認文字列つきで、PhysicalDrive0とマウント中は拒否。
+- 未確認(次回の再開点): 実USBメモリへの書き込み、`format --device`の実ディスク試験、光学ドライブでの書き込み、実機UEFI起動(ブートローダーGRUBは未同梱・`--bootloader`で渡す)、NTFS/ext4のmkfs連携、10言語版ドキュメントへの反映。
+- 検証環境の注意: WSL(Ubuntu)に`dosfstools`と`mtools`を追加導入した(FAT検証用)。8GiBの疎イメージを`/mnt/c`越しにddすると非常に遅いので、検証は小さいイメージを`/tmp`へコピーして行う。
+
+
+## お引越し・再開メモ: dream-os-disk(2026-10-18、Windows再起動前) / Hand-off: dream-os-disk (2026-10-18, before Windows restart)
+
+**日本語**
+- **到達点**: `crates/dream-os-disk`(GPT・FAT32・ISO9660+Joliet+El Torito UEFI・GRUB/QEMU設定・CLI)と`installer/windows/make-usb.ps1`をpush済み(`d5ab8d2`)。単体試験15件成功。第三者ツールで構造を確認済み(`sfdisk --verify`、`fsck.vfat`=エラー無し、Windowsの`Mount-DiskImage`で日本語の長い名前を読めた)。
+- **未コミットだった修正**: `make-usb.ps1`の「MBRのUSBでGPT初期化が失敗する」不具合の修正(`Clear-Disk`後に`PartitionStyle`を見て`Initialize-Disk`/`Set-Disk`を使い分け)。この`HANDOFF`と同じコミットに含めた。
+- **中断した作業(最優先)**: 実USBメモリ(ディスク3「USB DISK 3.2」58.2GB)への書き込み。この環境からはUACが「ユーザーによりキャンセル」になり昇格できなかったため、**ユーザーが管理者PowerShellで実行する**手順にした。再起動でディスク番号が変わることがあるので、**必ず先に`-List`で番号を確認**すること。
+  ```
+  Set-ExecutionPolicy -Scope Process Bypass -Force
+  F:/dream-os/installer/windows/make-usb.ps1 -List
+  F:/dream-os/installer/windows/make-usb.ps1 -IsoPath <dreamos.iso> -DiskNumber <番号> -Execute -ConfirmText "ERASE <番号>"
+  ```
+- **`dreamos.iso`の再生成**(前回のISOは一時フォルダにあり、消えている可能性がある): WSL(Ubuntu、`grub-efi-amd64-bin`導入済み)で`grub-mkstandalone -O x86_64-efi -o BOOTX64.EFI --modules="part_gpt part_msdos fat ext2 chain search search_fs_file configfile normal echo ls loadenv efifwsetup efi_gop all_video" "boot/grub/grub.cfg=embed.cfg"`(`embed.cfg`は`search --no-floppy --file --set=root /EFI/BOOT/grub.cfg`と`configfile /EFI/BOOT/grub.cfg`の2行)。その後`cargo run -p dream-os-disk --release -- make-iso --payload <DIR> --out dreamos.iso --os windows,linux,dreamos --bootloader BOOTX64.EFI`。モジュール名の注意: `fwsetup`ではなく`efifwsetup`、`efi_uga`はx86_64-efiに無い。
+- **未確認(実機)**: USBへの実書き込みとファイル照合、USBからのUEFI起動(GRUBメニュー→Windowsチェイン)、`format --device`の実ディスク試験、光学ドライブへの書き込み(`make-usb.ps1 -BurnCd`)、NTFS/ext4のmkfs連携、他言語READMEへの反映。
+- **注意**: ① `F:/dream-os/vsc/`は別セッションの未追跡作業。触らない・コミットしない。② 8GiBの疎イメージを`/mnt/c`越しにddすると非常に遅いので、検証は小さいイメージを`/tmp`へ。③ WSLに`dosfstools`・`mtools`・`grub-efi-amd64-bin`を追加導入済み。④ `.ps1`はUTF-8 BOM+CRLFを保つ(`.gitattributes`)。
+- **別PCへの引っ越し**: `git clone https://github.com/aon-co-jp/dream-os`、Rust導入、`cargo test -p dream-os-disk`(依存ゼロなので他リポジトリ不要。ただしワークスペース全体のビルドには`../open-web-server`等の兄弟リポジトリが要る)。WindowsのISO/USB作成は管理者権限と`Get-Disk`が使えるWindowsが必要。
+
+**English**
+- **State**: `crates/dream-os-disk` (GPT, FAT32, ISO9660+Joliet+El Torito UEFI, GRUB/QEMU config, CLI) and `installer/windows/make-usb.ps1` are pushed (`d5ab8d2`); 15 unit tests pass; structures verified by third-party tools (`sfdisk --verify`, `fsck.vfat` clean, Windows `Mount-DiskImage` reads the Japanese long names).
+- **Fix that was uncommitted**: `make-usb.ps1` failed to GPT-initialise an MBR USB stick; it now checks `PartitionStyle` after `Clear-Disk` and uses `Initialize-Disk` or `Set-Disk`. Committed together with this note.
+- **Interrupted (top priority)**: writing to a real USB stick (disk 3, "USB DISK 3.2", 58.2 GB). UAC elevation from this environment was cancelled three times, so **the user runs it from an elevated PowerShell**. Disk numbers can change after a reboot, so **run `-List` first** (commands above).
+- **Regenerating `dreamos.iso`** (the earlier ISO was in a temp folder): build `BOOTX64.EFI` with `grub-mkstandalone` in WSL (modules and embed config above; use `efifwsetup`, not `fwsetup`; `efi_uga` does not exist for x86_64-efi), then `dream-os-disk make-iso --payload <DIR> --out dreamos.iso --os windows,linux,dreamos --bootloader BOOTX64.EFI`.
+- **Not verified on hardware**: the actual USB write and file comparison, UEFI boot from the stick (GRUB menu → Windows chain-load), `format --device` on a real disk, disc burning (`-BurnCd`), NTFS/ext4 mkfs integration, other-language READMEs.
+- **Cautions**: `F:/dream-os/vsc/` is another session's untracked work — do not touch or commit it. dd of an 8 GiB sparse image over `/mnt/c` is very slow; copy small images to `/tmp`. WSL now has `dosfstools`, `mtools`, `grub-efi-amd64-bin`. Keep `.ps1` as UTF-8 BOM + CRLF.
+- **Moving to another PC**: clone the repo, install Rust, run `cargo test -p dream-os-disk` (zero dependencies; building the whole workspace also needs sibling repos such as `../open-web-server`). Making the USB needs Windows with admin rights and `Get-Disk`.
+
+
+## DreamOSインストーラー環境(2026-10-18) / DreamOS installer environment
+**日本語**: GRUBの「DreamOS Installer」を選ぶと、USB/CDからLinuxカーネル(Ubuntu、`/dreamos/vmlinuz`)と自作initramfs(`/dreamos/initrd.img`)が起動し、テキストのインストーラーが開く。画面は英語のみ(Linuxのコンソールは日本語を描画できない)。機能: ディスク/パーティション表示、**既存NTFSの縮小(データ保持)→DreamOS用ext4とOS間共有exFATの作成**(実行前にパーティション表をバックアップ、`SHRINK <ディスク> <番号> <GB>`の入力が必要)、シェル、再起動、電源オフ。
+- 作り方(WSL/Ubuntu、`linux-image-generic busybox-static ntfs-3g gdisk exfatprogs dosfstools grub-efi-amd64-bin qemu-system-x86 ovmf`が要る): `installer/linux/build-initramfs.sh <出力>`、`build-grub-efi.sh <BOOTX64.EFI>`、その後`dream-os-disk make-iso --payload <出力> --bootloader BOOTX64.EFI`、`make-usb.ps1`または既存USBへ複写。WSLの`/tmp`は再起動で消えるので`/root`に置く。
+- 試験(いずれもQEMU/TCG、WSLはKVM不可): `test-qemu.sh`=NVMe+NTFS(12MBのファイル)を縮小して4パーティション化、**データのSHA-256一致**。`test-qemu-uefi.sh`=ISOをUEFI(OVMF)のCDとして起動→GRUB→DreamOS項目→カーネル→インストーラーのメニュー表示(`shot.png`で目視)。実機のUSBには複写済み(ハッシュ一致)。
+- `installer/windows/add-dreamos-partitions.ps1`: Windows上から同じことをする方式(確認のみが既定、`Resize-Partition`)。**未実行**。
+- **注意/落とし穴**: `ntfsresize`は縮小後に「次回Windows起動時にchkdsk」の印を付ける(`ntfscat`等は`-f`が要る)。WindowsのFast Startup/休止状態だと縮小を拒否する(完全シャットダウンしてから)。GRUBは日本語フォントを持たないのでメニュー題名はASCII。GRUBは署名なし→セキュアブートをオフ。DreamOS**本体のOSはまだ無い**(現状は「ディスクを準備する道具」)。
+- **未確認(実機)**: 実ディスクの縮小(未実行。バックアップを取ってから)、実機での起動後のキー入力(JIS配列)、USBキーボード/NVMeのドライバ読み込み(QEMUでNVMeは確認)。
+**English**: Selecting "DreamOS Installer" in GRUB boots an Ubuntu kernel plus a custom initramfs from the USB/CD and opens a text installer (English only; the Linux console cannot draw Japanese). It lists disks, **shrinks an existing NTFS partition (data kept) and creates a DreamOS ext4 partition and a shared exFAT partition** (partition table backed up first; requires typing `SHRINK <disk> <n> <GB>`), and offers a shell/reboot/power-off. Build: `installer/linux/build-initramfs.sh`, `build-grub-efi.sh`, then `dream-os-disk make-iso`. Tests (QEMU/TCG): `test-qemu.sh` shrinks a virtual NVMe NTFS disk and the file's SHA-256 is unchanged; `test-qemu-uefi.sh` boots the ISO as a UEFI CD through GRUB into the installer menu. The stick was updated (hashes match). `add-dreamos-partitions.ps1` does the same from Windows (dry-run by default, not run yet). Caveats: `ntfsresize` schedules a chkdsk (use `-f` with ntfs tools afterwards) and refuses hibernated/Fast-Startup volumes; GRUB is unsigned (Secure Boot off); there is still no DreamOS system itself. Not verified on hardware: shrinking a real disk (back up first), JIS keyboard input, USB keyboard drivers.
+
+## API 方針: REST 全廃・gRPC / Connect へ (2026-11-04)
+
+### 日本語
+- **REST は全廃する。新しい API は REST で作らない。** ブラウザや `curl` から呼ぶ API は **Connect の単純呼び出し**(`POST /<パッケージ>.<Service>/<Method>`、`content-type: application/json`、本文は JSON)、サービス間は **gRPC / gRPC-web**(RPoem の管理API `open_runo.admin.v1.Admin` と同じ流儀)。ストリーミングは、必要になってから。
+- **既存の REST は、触るときに順に移す。** 移したら旧 REST の経路は消す。移行が終わるまで残るが、**新規には追加しない**。
+- **JSON は RS-JSON に統一**する(読み込みは `from_str_secure` / `parse_secure` でサイズ・深さ・重複キーの上限つき、書き出しは `rust_json::fast`)。ブラウザの WASM に `prost` は入れない(サイズが増えるため)。
+- **例外(自分たちの API ではなく、相手の規格が決めているもの)**: ACME、OAuth/OIDC のコールバック、第三者(GitHub など)からの Webhook、ヘルスチェック、静的ファイル配信、OTLP など。これらは規格どおりの HTTP を受ける。
+- 参考実装: `RPoem`(`open_runo.admin.v1.Admin`)、`open-easy-web`(`server/src/connect.rs`、`proto/open_easy_web/admin/v1/admin.proto`)。
+- ※ このリポジトリのコードが既に方針どおりかどうかは、各リポジトリの現状による。この節は方針の記録であり、コードの変更を意味しない。
+
+### English
+- **REST is being abolished. New APIs are not built as REST.** APIs called from browsers or `curl` use **Connect unary calls** (`POST /<package>.<Service>/<Method>`, `content-type: application/json`, JSON body); service-to-service calls use **gRPC / gRPC-web** (the same style as RPoem's admin API `open_runo.admin.v1.Admin`). Streaming only when it is actually needed.
+- **Existing REST endpoints are migrated one by one, when they are touched.** The old REST route is removed once migrated. Until migration is finished they remain, but **no new ones are added**.
+- **JSON is unified on RS-JSON**: reading with `from_str_secure` / `parse_secure` (size, depth and duplicate-key limits), writing with `rust_json::fast`. `prost` is not put into browser WASM (it would grow the binary).
+- **Exceptions (shapes dictated by someone else's standard, not our own API)**: ACME, OAuth/OIDC callbacks, webhooks from third parties (e.g. GitHub), health checks, static file serving, OTLP, and so on. These accept plain HTTP as the standard requires.
+- Reference implementations: `RPoem` (`open_runo.admin.v1.Admin`) and `open-easy-web` (`server/src/connect.rs`, `proto/open_easy_web/admin/v1/admin.proto`).
+- Note: whether the code in a given repository already follows this policy depends on that repository. This section records the policy; it does not mean the code has been changed.
+
+### Deutsch (KI-Übersetzung, redaktionell überarbeitet; noch nicht von Muttersprachlern geprüft)
+- **REST wird vollständig abgeschafft; neue APIs entstehen nicht mehr als REST.** APIs, die aus dem Browser oder per `curl` aufgerufen werden, verwenden **unäre Connect-Aufrufe** (`POST /<Paket>.<Service>/<Methode>`, `content-type: application/json`, JSON-Body). Zwischen Diensten kommen **gRPC bzw. gRPC-web** zum Einsatz, im selben Stil wie die Admin-API von RPoem (`open_runo.admin.v1.Admin`). Streaming wird erst ergänzt, wenn es tatsächlich gebraucht wird.
+- **Bestehende REST-Endpunkte werden schrittweise umgestellt, und zwar immer dann, wenn man ohnehin an ihnen arbeitet.** Sobald ein Endpunkt umgestellt ist, wird die alte REST-Route entfernt. Bis zum Abschluss der Migration bleiben die übrigen bestehen, es werden aber **keine neuen mehr hinzugefügt**.
+- **JSON wird einheitlich über RS-JSON verarbeitet**: Gelesen wird mit `from_str_secure` bzw. `parse_secure` (mit Obergrenzen für Größe, Verschachtelungstiefe und doppelte Schlüssel), geschrieben mit `rust_json::fast`. `prost` wird nicht in das Browser-WASM aufgenommen, da es die Datei vergrößern würde.
+- **Ausnahmen (Schnittstellen, deren Form ein fremder Standard vorgibt und die nicht zu unserer eigenen API gehören)**: ACME, OAuth/OIDC-Callbacks, Webhooks von Drittanbietern (z. B. GitHub), Health-Checks, die Auslieferung statischer Dateien, OTLP und Ähnliches. Diese nehmen, wie vom jeweiligen Standard verlangt, gewöhnliches HTTP entgegen.
+- Referenzimplementierungen: `RPoem` (`open_runo.admin.v1.Admin`) und `open-easy-web` (`server/src/connect.rs`, `proto/open_easy_web/admin/v1/admin.proto`).
+- Hinweis: Ob der Code eines einzelnen Repositorys diese Richtlinie bereits erfüllt, hängt vom jeweiligen Repository ab. Dieser Abschnitt dokumentiert lediglich die Richtlinie; er besagt nicht, dass der Code schon angepasst wurde.
+
+### Русский (перевод выполнен с помощью ИИ и отредактирован; носителями языка пока не проверен)
+- **От REST мы полностью отказываемся; новые API больше не создаются в стиле REST.** API, к которым обращаются из браузера или через `curl`, используют **унарные вызовы Connect** (`POST /<пакет>.<Service>/<Method>`, `content-type: application/json`, тело запроса — JSON). Для взаимодействия между сервисами применяются **gRPC и gRPC-web** — в том же стиле, что и административный API RPoem (`open_runo.admin.v1.Admin`). Потоковая передача данных добавляется лишь тогда, когда в ней действительно возникает необходимость.
+- **Существующие REST-эндпоинты переводятся поэтапно — по мере того, как с ними приходится работать.** После перевода старый REST-маршрут удаляется. Пока миграция не завершена, оставшиеся эндпоинты сохраняются, но **новые не добавляются**.
+- **Работа с JSON унифицирована на основе RS-JSON**: чтение — через `from_str_secure` или `parse_secure` (с ограничениями на размер, глубину вложенности и повторяющиеся ключи), запись — через `rust_json::fast`. `prost` в браузерный WASM не включается, поскольку это увеличило бы размер файла.
+- **Исключения (интерфейсы, форму которых определяет чужой стандарт, а не наш собственный API)**: ACME, обратные вызовы OAuth/OIDC, вебхуки сторонних сервисов (например, GitHub), проверки работоспособности, раздача статических файлов, OTLP и тому подобное. Такие интерфейсы принимают обычный HTTP, как того требует соответствующий стандарт.
+- Эталонные реализации: `RPoem` (`open_runo.admin.v1.Admin`) и `open-easy-web` (`server/src/connect.rs`, `proto/open_easy_web/admin/v1/admin.proto`).
+- Примечание: соответствует ли код конкретного репозитория этой политике, зависит от самого репозитория. Данный раздел лишь фиксирует политику и не означает, что код уже изменён.
+
+## API 方針の補足: 用語の整理と使い分け (2026-11-04)
+
+### 日本語
+**1つに統一するものではなく、別の層の話です。** 「REST の代わり」になるのは Connect・gRPC・GraphQL だけで、WASM は画面を作る技術です。
+
+| 用語 | 何か | REST の代わりか |
+|---|---|---|
+| REST | URL と HTTP メソッドで操作を表す API の作り方 | 全廃する側 |
+| **Connect** | `POST /サービス名/メソッド名` に JSON を送る形式。`curl` でもブラウザの `fetch` でも呼べる | はい(**採用**) |
+| **gRPC** | 同じ「サービス/メソッド」の考え方を、バイナリ(protobuf)と HTTP/2 で行う形式。速く、ストリーミングも得意 | はい(**サービス同士に採用**) |
+| gRPC-web | gRPC のブラウザ向けの変形版 | はい(必要なら) |
+| GraphQL | 欲しい項目を問い合わせる形式 | 一部だけ(**問い合わせ(読み取り)専用**) |
+| WASM | Rust をブラウザの中で動かす仕組み | いいえ(画面を作る技術) |
+
+- **ブラウザの画面や `curl` から呼ぶ API は Connect**(POST、JSON を RS-JSON で読み書き)。ブラウザの WASM は素の gRPC を話せず、Connect なら `fetch` のままで、`prost` を足さずに済む(画面のサイズも増えない)。
+- **サービス同士の通信(サーバー間、重い処理、ストリーミング)は gRPC。** 多くは Connect で足りるので、ストリーミングが必要になった所だけ gRPC に上げる。
+- **GraphQL は、まとめて問い合わせたいときの読み取り専用。** 書き込み(操作)には使わない。
+- **WASM は画面を作る技術として、そのまま使う。** 画面から呼ぶ API が Connect になっただけ。
+- 外部の規格が形を決めるもの(ACME、OAuth のコールバック、第三者の Webhook、ヘルスチェック、静的ファイル、OTLP)は、規格どおりの HTTP のまま。
+- **迷ったら Connect。**
+
+### English
+**These are not alternatives to unify; they sit at different layers.** Only Connect, gRPC and GraphQL can replace REST; WASM is a way to build the UI.
+
+| Term | What it is | Replaces REST? |
+|---|---|---|
+| REST | API style that expresses operations through URLs and HTTP methods | The thing being abolished |
+| **Connect** | `POST /Service/Method` with a JSON body; callable from `curl` and from a browser `fetch` | Yes (**adopted**) |
+| **gRPC** | The same service/method idea over binary (protobuf) and HTTP/2; fast, good at streaming | Yes (**for service-to-service**) |
+| gRPC-web | A browser-friendly variant of gRPC | Yes (if needed) |
+| GraphQL | A query language: ask for exactly the fields you want | Partly (**read-only queries**) |
+| WASM | Runs Rust inside the browser | No (a UI technology) |
+
+- **APIs called from browser screens or `curl` use Connect** (POST, JSON read and written with RS-JSON). Browser WASM cannot speak plain gRPC; with Connect it stays a `fetch`, and `prost` is not needed (the binary does not grow).
+- **Service-to-service calls (server to server, heavy work, streaming) use gRPC.** Connect is enough in most places; move a call to gRPC only where streaming is actually needed.
+- **GraphQL is read-only**, for queries that gather several pieces of data. It is not used for writes (operations).
+- **WASM stays as the way to build the UI.** The API it calls simply became Connect.
+- Interfaces whose shape an outside standard dictates (ACME, OAuth callbacks, third-party webhooks, health checks, static files, OTLP) stay plain HTTP.
+- **When in doubt, use Connect.**
+
+### Deutsch (KI-Übersetzung, sprachlich überarbeitet; noch nicht von Muttersprachlern geprüft)
+**Es geht nicht darum, eine einzige Technik auszuwählen – die Begriffe liegen auf unterschiedlichen Ebenen.** Als Ersatz für REST kommen nur Connect, gRPC und GraphQL in Frage; WASM dagegen ist eine Technik, mit der die Benutzeroberfläche gebaut wird.
+
+| Begriff | Was ist das? | Ersatz für REST? |
+|---|---|---|
+| REST | Ein API-Stil, bei dem Operationen über URLs und HTTP-Methoden ausgedrückt werden | wird abgeschafft |
+| **Connect** | `POST /Dienst/Methode` mit JSON im Body; aufrufbar mit `curl` ebenso wie mit `fetch` im Browser | ja (**gewählt**) |
+| **gRPC** | Dasselbe Prinzip aus Dienst und Methode, aber über binäres protobuf und HTTP/2; schnell und gut für Streaming geeignet | ja (**zwischen Diensten**) |
+| gRPC-web | Eine für den Browser angepasste Variante von gRPC | ja (bei Bedarf) |
+| GraphQL | Abfragesprache, mit der man genau die benötigten Felder anfordert | teilweise (**nur für lesende Abfragen**) |
+| WASM | Führt Rust-Code direkt im Browser aus | nein (Technik für die Oberfläche) |
+
+- **APIs, die von Browseroberflächen oder per `curl` aufgerufen werden, verwenden Connect** (POST; JSON wird mit RS-JSON gelesen und geschrieben). WASM im Browser kann kein reines gRPC sprechen. Mit Connect bleibt es bei einem gewöhnlichen `fetch`, und `prost` ist nicht nötig – die WASM-Datei wird dadurch nicht größer.
+- **Für die Kommunikation zwischen Diensten (Server zu Server, rechenintensive Aufgaben, Streaming) wird gRPC eingesetzt.** In den meisten Fällen reicht Connect aus; auf gRPC wird nur dort umgestellt, wo Streaming tatsächlich gebraucht wird.
+- **GraphQL dient ausschließlich lesenden Abfragen**, wenn mehrere Informationen gebündelt abgefragt werden sollen. Für Schreibzugriffe (Operationen) wird es nicht verwendet.
+- **WASM bleibt die Technik für die Oberfläche.** Geändert hat sich lediglich, dass die aufgerufene API nun auf Connect beruht.
+- Schnittstellen, deren Form durch einen externen Standard festgelegt ist (ACME, OAuth-Callbacks, Webhooks von Drittanbietern, Health-Checks, statische Dateien, OTLP), bleiben gewöhnliches HTTP.
+- **Im Zweifel: Connect.**
+
+### Русский (перевод выполнен с помощью ИИ и литературно отредактирован; носителями языка пока не проверен)
+**Это не варианты, из которых нужно выбрать один, а технологии разных уровней.** Заменить REST могут только Connect, gRPC и GraphQL; WASM же — это способ создания пользовательского интерфейса.
+
+| Термин | Что это | Заменяет REST? |
+|---|---|---|
+| REST | Стиль построения API, при котором операции выражаются через URL и HTTP-методы | отменяется |
+| **Connect** | `POST /Сервис/Метод` с телом в формате JSON; вызывается как из `curl`, так и из браузерного `fetch` | да (**выбран**) |
+| **gRPC** | Тот же принцип «сервис — метод», но поверх двоичного формата protobuf и HTTP/2; работает быстро и хорошо подходит для потоковой передачи | да (**для связи между сервисами**) |
+| gRPC-web | Адаптированный для браузера вариант gRPC | да (при необходимости) |
+| GraphQL | Язык запросов: клиент запрашивает ровно те поля, которые ему нужны | частично (**только запросы на чтение**) |
+| WASM | Позволяет выполнять код на Rust прямо в браузере | нет (технология для интерфейса) |
+
+- **API, которые вызываются из браузерных интерфейсов или через `curl`, строятся на Connect** (POST; JSON читается и записывается через RS-JSON). Браузерный WASM не умеет работать с «чистым» gRPC. С Connect достаточно обычного `fetch`, а `prost` не требуется — размер WASM-файла не увеличивается.
+- **Для обмена между сервисами (сервер — сервер, ресурсоёмкие задачи, потоковая передача) применяется gRPC.** В большинстве случаев достаточно Connect; на gRPC переходят только там, где потоковая передача действительно необходима.
+- **GraphQL используется только для чтения**, когда нужно получить сразу несколько связанных данных. Для записи (операций) он не применяется.
+- **WASM по-прежнему остаётся технологией для интерфейса.** Изменилось лишь то, что вызываемый им API теперь построен на Connect.
+- Интерфейсы, форма которых задана внешним стандартом (ACME, обратные вызовы OAuth, вебхуки сторонних сервисов, проверки работоспособности, статические файлы, OTLP), остаются обычным HTTP.
+- **Если есть сомнения — выбирайте Connect.**
