@@ -1,3 +1,3 @@
 source: aon-co-jp/dream-os
-commit: d3ce1759c7f90e8cd35b1e23e2e5051503b9787b
-updated: 2026-11-27T05:57:30Z
+commit: e11b03c485369be11a458685f7f05b56dd1f2478
+updated: 2026-11-27T05:57:57Z
